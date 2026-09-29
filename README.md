@@ -24,7 +24,7 @@ Hermione → Гермиона, Гермионы, Гермионе, Гермио�
 ## Установка
 
 1. SillyTavern → **Extensions** (кубики) → **Install extension**.
-2. Вставить ссылку на репозиторий: `https://github.com/YOUR_GITHUB_NAME/SillyTavern-LorebookLocalizer`.
+2. Вставить ссылку на репозиторий: `https://github.com/Likerch/SillyTavern-LorebookLocalizer.git`.
 3. Открыть панель **«Миры и лорбуки»**: рядом с кнопкой «Дублировать» появится иконка языка (`fa-language`).
 
 Проверено на SillyTavern 1.19.0.
@@ -94,7 +94,7 @@ npm test
 - Added keys are tracked in `entry.extensions.lorebook_localizer`. Re-runs skip already translated keys, and a "remove added keys" action undoes everything.
 - Batches are sized by tokens. Structured output is used when available, with automatic fallback. Missing ids are retried and truncated replies are split.
 
-Install: *Extensions → Install extension →* `https://github.com/YOUR_GITHUB_NAME/SillyTavern-LorebookLocalizer`.
+Install: *Extensions → Install extension →* `https://github.com/Likerch/SillyTavern-LorebookLocalizer.git`.
 
 ## License
 
