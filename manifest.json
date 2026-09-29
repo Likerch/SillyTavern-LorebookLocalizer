@@ -1,0 +1,14 @@
+{
+    "display_name": "Lorebook Localizer",
+    "loading_order": 100,
+    "js": "index.js",
+    "css": "style.css",
+    "author": "Liriker",
+    "version": "0.1.0",
+    "homePage": "https://github.com/YOUR_GITHUB_NAME/SillyTavern-LorebookLocalizer",
+    "auto_update": true,
+    "i18n": {
+        "ru-ru": "i18n/ru-ru.json",
+        "ru": "i18n/ru-ru.json"
+    }
+}
