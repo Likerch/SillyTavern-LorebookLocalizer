@@ -77,5 +77,10 @@
     "Remove added keys?": "Удалить добавленные ключи?",
     "Keys added by this extension will be removed from ${0} lorebooks. Original keys and added keys you edited by hand stay.": "Ключи, добавленные этим расширением, будут удалены из лорбуков (${0} шт.). Исходные ключи и добавленные ключи, изменённые вручную, останутся.",
     "Remove": "Удалить",
-    "All languages, not only ${0}": "Все языки, а не только ${0}"
+    "All languages, not only ${0}": "Все языки, а не только ${0}",
+    "BunnyMo books and packs are not localized, skipped: ${0}": "Лорбуки и паки BunnyMo не локализуются, пропущены: ${0}",
+    "BunnyMo books and packs (marked) are not localized: BunnyMo matches their tag keys exactly as written. They can be allowed in Options.": "Лорбуки и паки BunnyMo (с пометкой) не локализуются: BunnyMo ищет их ключи-теги ровно в том виде, как они записаны. Разрешить их можно в «Параметрах».",
+    "BunnyMo": "BunnyMo",
+    "Allow BunnyMo books and packs (not recommended)": "Разрешить лорбуки и паки BunnyMo (не рекомендуется)",
+    "Translated keys in BunnyMo packs only add false triggers. Turn it on to remove keys added to them earlier.": "Переведённые ключи в паках BunnyMo дают только ложные срабатывания. Включите, чтобы убрать ключи, добавленные в них раньше."
 }

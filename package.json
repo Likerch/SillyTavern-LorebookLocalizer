@@ -1,6 +1,6 @@
 {
     "name": "sillytavern-lorebook-localizer",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "private": true,
     "description": "SillyTavern extension: translate lorebook keys with an LLM and add regex keys that cover every word form.",
     "type": "module",

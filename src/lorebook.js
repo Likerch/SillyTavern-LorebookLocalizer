@@ -1,5 +1,8 @@
 import { applyToEntry, collectEntryTerms, contextExcerpt, KEY_FIELDS, removeFromEntry } from './entries.js';
+import { isProtectedBookData } from './protected.js';
 import { download, setWIOriginalDataValue } from './st.js';
+
+export { toPromptItem } from './entries.js';
 
 /** Name of the lorebook currently open in the World Info editor, if any. */
 export function getOpenEditorBook() {
@@ -22,13 +25,24 @@ function mirrorKeysToOriginalData(data, entry) {
 }
 
 /**
+ * BunnyMo's book or one of its packs (see protected.js): never localized by default.
+ * @param {string} book
+ */
+export async function isProtectedBook(book) {
+    const data = await SillyTavern.getContext().loadWorldInfo(book);
+    return isProtectedBookData(data);
+}
+
+/**
  * Gathers the entries (and their keys) that need translation.
  * @param {string[]} bookNames
+ * @param {{uids?: Set<number>|null, skipProtected?: boolean}} [options] `uids`: only these entries;
+ *        `skipProtected`: leave BunnyMo books and packs out (listed in `stats.protectedBooks`)
  */
-export async function collectItems(bookNames, settings, lang) {
+export async function collectItems(bookNames, settings, lang, { uids = null, skipProtected = false } = {}) {
     const ctx = SillyTavern.getContext();
     const items = [];
-    const stats = { books: 0, entries: 0, terms: 0, skippedRegex: 0, skippedScript: 0, skippedDone: 0, missingBooks: [] };
+    const stats = { books: 0, entries: 0, terms: 0, skippedRegex: 0, skippedScript: 0, skippedDone: 0, missingBooks: [], protectedBooks: [] };
     let nextId = 1;
 
     for (const book of bookNames) {
@@ -37,8 +51,13 @@ export async function collectItems(bookNames, settings, lang) {
             stats.missingBooks.push(book);
             continue;
         }
+        if (skipProtected && isProtectedBookData(data)) {
+            stats.protectedBooks.push(book);
+            continue;
+        }
         stats.books++;
         for (const entry of Object.values(data.entries)) {
+            if (uids && !uids.has(Number(entry.uid))) continue;
             const collected = collectEntryTerms(entry, settings, lang);
             if (!collected) continue;
             stats.skippedRegex += collected.skipped.regex;
@@ -59,15 +78,6 @@ export async function collectItems(bookNames, settings, lang) {
         }
     }
     return { items, stats };
-}
-
-/** The part of an item that is sent to the model. */
-export function toPromptItem(item) {
-    const promptItem = { id: item.id, book: item.book };
-    if (item.title) promptItem.title = item.title;
-    if (item.context) promptItem.context = item.context;
-    promptItem.terms = item.terms;
-    return promptItem;
 }
 
 function timestamp() {

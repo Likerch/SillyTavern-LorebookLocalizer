@@ -76,6 +76,15 @@ export function collectEntryTerms(entry, settings, lang) {
     return { terms: values.map(v => v.term), fieldsByTerm: new Map(values.map(v => [v.term, v.fields])), skipped };
 }
 
+/** The part of a collected item that is sent to the model. */
+export function toPromptItem(item) {
+    const promptItem = { id: item.id, book: item.book };
+    if (item.title) promptItem.title = item.title;
+    if (item.context) promptItem.context = item.context;
+    promptItem.terms = item.terms;
+    return promptItem;
+}
+
 /**
  * @param {{content?: string}} entry
  * @param {number} maxChars

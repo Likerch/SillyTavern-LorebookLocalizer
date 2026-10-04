@@ -1,11 +1,13 @@
 import { CUSTOM_LANGUAGE_ID, EXTENSION_TITLE, LANGUAGES, resolveLanguage } from './constants.js';
 import { getProfiles } from './connection.js';
-import { getOpenEditorBook } from './lorebook.js';
+import { getOpenEditorBook, isProtectedBook } from './lorebook.js';
 import { looksLikeRegexKey } from './regex-builder.js';
 import { clampSetting, getSettings, NUMBER_LIMITS, saveSettings, t } from './settings.js';
 import { parseRegexFromString, splitKeywordsAndRegexes } from './st.js';
 
 const BUTTON_ID = 'lorebook_localizer_button';
+/** Lorebooks checked at once for protection while the dialog is open. */
+const PROTECTION_CHECKS = 4;
 
 // All user-provided text (book names, titles, keys) goes through .text()/.val(), never into HTML strings.
 
@@ -178,11 +180,14 @@ export async function openMainDialog() {
 
     // Lorebooks
     const bookList = $('<div class="lbl-book-list">');
+    /** @type {Map<string, {input: JQuery, label: JQuery}>} */
+    const bookRows = new Map();
     for (const book of books) {
         const input = $('<input type="checkbox">').val(book).prop('checked', selected.has(book));
         const label = $('<label class="checkbox_label lbl-book">').append(input, $('<span>').text(book));
         if (book === openBook) label.append($('<small class="lbl-badge">').text(t`open`));
         bookList.append(label);
+        bookRows.set(book, { input, label });
     }
     const counter = $('<span class="lbl-counter">');
     const getChosen = () => bookList.find('input:checked').map((_, el) => /** @type {HTMLInputElement} */ (el).value).get();
@@ -194,9 +199,55 @@ export async function openMainDialog() {
         bookList.children().each((_, el) => { $(el).toggle($(el).text().toLowerCase().includes(query)); });
     });
     const setVisible = (checked) => {
-        bookList.children(':visible').find('input').prop('checked', checked);
+        bookList.children(':visible').find('input:not(:disabled)').prop('checked', checked);
         updateCounter();
     };
+
+    // BunnyMo books and packs are found in the background and shown disabled unless allowed in the options.
+    const protectedBooks = new Set();
+    const protectedHint = $('<div class="lbl-hint lbl-protected-hint">')
+        .text(t`BunnyMo books and packs (marked) are not localized: BunnyMo matches their tag keys exactly as written. They can be allowed in Options.`)
+        .hide();
+    const syncProtected = () => {
+        const allowed = Boolean(settings.localizeProtected);
+        for (const book of protectedBooks) {
+            const { input } = /** @type {{input: JQuery}} */ (bookRows.get(book));
+            input.prop('disabled', !allowed);
+            if (!allowed) input.prop('checked', false);
+        }
+        protectedHint.toggle(protectedBooks.size > 0 && !allowed);
+        updateCounter();
+    };
+    const markProtected = (book) => {
+        const row = bookRows.get(book);
+        if (!row || protectedBooks.has(book)) return;
+        protectedBooks.add(book);
+        row.label.addClass('lbl-protected').append($('<small class="lbl-badge">').text(t`BunnyMo`));
+        syncProtected();
+    };
+    let dialogOpen = true;
+    const pending = [...books];
+    const checkNext = async () => {
+        while (dialogOpen && pending.length) {
+            const book = /** @type {string} */ (pending.shift());
+            try {
+                if (await isProtectedBook(book)) markProtected(book);
+            } catch (error) {
+                console.debug(`[${EXTENSION_TITLE}] Could not check "${book}"`, error);
+            }
+        }
+    };
+    for (let i = 0; i < PROTECTION_CHECKS; i++) void checkNext();
+
+    const allowProtected = $('<input type="checkbox">').prop('checked', Boolean(settings.localizeProtected));
+    allowProtected.on('change', () => {
+        settings.localizeProtected = allowProtected.prop('checked');
+        saveSettings();
+        syncProtected();
+    });
+    const allowProtectedLabel = $('<label class="checkbox_label lbl-option">')
+        .append(allowProtected, $('<span>').text(t`Allow BunnyMo books and packs (not recommended)`))
+        .attr('title', t`Translated keys in BunnyMo packs only add false triggers. Turn it on to remove keys added to them earlier.`);
 
     root.append(
         $('<div class="lbl-section-title">').text(t`Lorebooks`),
@@ -207,6 +258,7 @@ export async function openMainDialog() {
             counter,
         ),
         bookList,
+        protectedHint,
     );
 
     // Options
@@ -228,6 +280,7 @@ export async function openMainDialog() {
             { value: 'copy', text: t`Save a copy as a new lorebook` },
             { value: 'none', text: t`No backup` },
         ]),
+        allowProtectedLabel,
     ));
 
     root.append($('<details class="lbl-details">').append(
@@ -266,6 +319,7 @@ export async function openMainDialog() {
     });
 
     const result = await popup.show();
+    dialogOpen = false;
     const chosen = getChosen();
     settings.lastSelectedBooks = chosen;
     saveSettings();

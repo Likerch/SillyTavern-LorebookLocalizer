@@ -29,6 +29,8 @@ export const DEFAULT_SETTINGS = Object.freeze({
     temperature: 0.2,
     useJsonSchema: true,
     lastSelectedBooks: [],
+    /** BunnyMo books and packs are skipped by the dialog unless this is on (the API never localizes them). */
+    localizeProtected: false,
 });
 
 const SLAVIC_CASES = (cases) => `List all ${cases} cases in the singular and, for countable common nouns, in the plural. `

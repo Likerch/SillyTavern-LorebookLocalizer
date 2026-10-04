@@ -108,6 +108,10 @@
     white-space: nowrap;
 }
 
+.lbl-protected:has(input:disabled) {
+    opacity: 0.6;
+}
+
 .lbl-details {
     border: 1px solid var(--SmartThemeBorderColor);
     border-radius: 6px;
