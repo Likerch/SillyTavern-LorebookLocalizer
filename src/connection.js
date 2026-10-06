@@ -1,5 +1,15 @@
+import { settledOrAborted } from './batching.js';
 import { RESPONSE_SCHEMA, SCHEMA_NAME } from './prompt.js';
 import { t } from './settings.js';
+import { isTimeoutError } from './translator.js';
+
+/**
+ * Released when the current connection's latest generateRawData call settles. generateRawData swaps the global
+ * response length through a single static slot, so a call never starts while an earlier one is still running, even
+ * one the Translator abandoned after a timeout or a stop (it ignores the late answer but the call goes on).
+ * @type {Promise<void>}
+ */
+let rawCallsDone = Promise.resolve();
 
 /**
  * Connection profiles usable for requests, or null when the Connection Manager extension is disabled.
@@ -33,16 +43,39 @@ export function resolveConnection(settings) {
 }
 
 /**
- * Creates the LLM call used by the Translator.
+ * Starts generateRawData and finds the stop hook it registers for this call.
+ *
+ * generateRawData takes no AbortSignal. It stops on GENERATION_STOPPED through a hook that it adds synchronously on
+ * entry (before its first await) and removes when it settles, so the listener that appears during the call is this
+ * call's own. Calling it aborts this request only. Emitting the event, or ctx.stopGeneration(), would also stop the
+ * user's chat generation, group auto mode and the raw generations of other extensions.
+ * @param {any} ctx
+ * @param {object} params
+ * @returns {{promise: Promise<any>, ownStop: (() => void)|null}}
+ */
+function startRawGeneration(ctx, params) {
+    const listeners = () => {
+        const list = ctx.eventSource?.events?.[ctx.eventTypes?.GENERATION_STOPPED];
+        return Array.isArray(list) ? list : [];
+    };
+    const before = new Set(listeners());
+    const promise = ctx.generateRawData(params);
+    const added = listeners().filter(listener => !before.has(listener));
+    return { promise, ownStop: added.length === 1 ? added[0] : null };
+}
+
+/**
+ * Creates the LLM call used by the Translator. The call stops and settles soon after its signal aborts (a stop or
+ * a timeout of the attempt).
  * @param {ReturnType<typeof resolveConnection>} connection
  * @param {{responseTokens: number, temperature: number}} settings
+ * @param {any} [ctx] SillyTavern's context (tests pass a fake one)
  * @returns {import('./translator.js').RequestFn}
  */
-export function createRequestFn(connection, settings) {
-    const ctx = SillyTavern.getContext();
-
+export function createRequestFn(connection, settings, ctx = SillyTavern.getContext()) {
     if (connection.kind === 'profile') {
-        // Sends through the chosen profile without switching the user's active connection.
+        // Sends through the chosen profile without switching the user's active connection. The signal goes down to
+        // fetch(); profile requests share no global state, so a retry may start while an aborted call winds down.
         return async (messages, { useSchema, signal }) => {
             const overridePayload = { temperature: settings.temperature };
             if (useSchema && connection.isChat) {
@@ -63,13 +96,44 @@ export function createRequestFn(connection, settings) {
     // Current connection. generateRawData is used instead of generateRaw because generateRaw runs the reply
     // through the user's regex scripts (e.g. quote replacement), which can corrupt JSON.
     return async (messages, { useSchema, signal }) => {
-        const onAbort = () => ctx.stopGeneration();
+        // Take the next turn synchronously, then wait for the previous call to settle.
+        const previous = rawCallsDone;
+        /** @type {() => void} */
+        let release = () => { };
+        rawCallsDone = new Promise(resolve => { release = resolve; });
+        try {
+            await settledOrAborted(previous, signal);
+            signal.throwIfAborted();
+        } catch (error) {
+            void previous.then(release);
+            throw error;
+        }
+
+        const jsonSchema = useSchema && connection.isChat
+            ? { name: SCHEMA_NAME, value: RESPONSE_SCHEMA, strict: true, returnInvalid: true }
+            : null;
+        /** @type {ReturnType<typeof startRawGeneration>} */
+        let call;
+        try {
+            call = startRawGeneration(ctx, { prompt: messages, responseLength: settings.responseTokens, jsonSchema });
+        } catch (error) {
+            release();
+            throw error;
+        }
+        call.promise.then(release, release);
+
+        const onAbort = () => {
+            if (call.ownStop) {
+                call.ownStop();
+            } else if (!isTimeoutError(signal.reason)) {
+                // The hook was not found (another SillyTavern version): a stop still stops everything, as before 0.3.
+                // A timed-out call is left to finish; the next call waits for it above.
+                ctx.stopGeneration();
+            }
+        };
         signal.addEventListener('abort', onAbort, { once: true });
         try {
-            const jsonSchema = useSchema && connection.isChat
-                ? { name: SCHEMA_NAME, value: RESPONSE_SCHEMA, strict: true, returnInvalid: true }
-                : null;
-            const data = await ctx.generateRawData({ prompt: messages, responseLength: settings.responseTokens, jsonSchema });
+            const data = await call.promise;
             signal.throwIfAborted();
             return jsonSchema ? data : ctx.extractMessageFromData(data);
         } finally {

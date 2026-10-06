@@ -70,10 +70,33 @@ export async function runPool(tasks, concurrency, signal) {
 export function delay(ms, signal) {
     return new Promise((resolve, reject) => {
         if (signal?.aborted) return reject(signal.reason);
-        const timer = setTimeout(resolve, ms);
-        signal?.addEventListener('abort', () => {
+        const onAbort = () => {
             clearTimeout(timer);
-            reject(signal.reason);
-        }, { once: true });
+            reject(signal?.reason);
+        };
+        const timer = setTimeout(() => {
+            signal?.removeEventListener('abort', onAbort);
+            resolve(undefined);
+        }, ms);
+        signal?.addEventListener('abort', onAbort, { once: true });
+    });
+}
+
+/**
+ * Settles when `promise` settles (its result is ignored) or rejects with the signal's reason when it aborts first.
+ * @param {Promise<unknown>} promise
+ * @param {AbortSignal} signal
+ * @returns {Promise<void>}
+ */
+export function settledOrAborted(promise, signal) {
+    if (signal.aborted) return Promise.reject(signal.reason);
+    return new Promise((resolve, reject) => {
+        const onAbort = () => reject(signal.reason);
+        signal.addEventListener('abort', onAbort, { once: true });
+        const done = () => {
+            signal.removeEventListener('abort', onAbort);
+            resolve();
+        };
+        promise.then(done, done);
     });
 }

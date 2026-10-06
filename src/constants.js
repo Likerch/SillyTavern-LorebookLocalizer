@@ -26,6 +26,8 @@ export const DEFAULT_SETTINGS = Object.freeze({
     maxConcurrency: 2,
     maxRetries: 2,
     responseTokens: 6000,
+    /** Seconds to wait for a reply; a request with no reply in time counts as a failed attempt. 0 = no limit. */
+    requestTimeout: 90,
     temperature: 0.2,
     useJsonSchema: true,
     lastSelectedBooks: [],

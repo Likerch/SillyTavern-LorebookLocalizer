@@ -1,5 +1,7 @@
 {
     "Lorebook Localizer is already running.": "Lorebook Localizer уже работает.",
+    "Lorebook Localizer is translating entries for another extension (Maestro). Open it again when that is done.": "Lorebook Localizer сейчас переводит записи для другого расширения (Maestro). Окно можно открыть, когда перевод закончится.",
+    "Lorebook Localizer is finishing a job for another extension; yours starts right after it.": "Lorebook Localizer заканчивает перевод для другого расширения. Этот запуск начнётся сразу после него.",
     "The connection profile cannot be used: ${0}": "Профиль подключения нельзя использовать: ${0}",
     "No API connection. Connect to an API or choose a connection profile.": "Нет соединения с API. Подключитесь к API или выберите профиль подключения.",
     "Nothing to translate: the keys are already localized, are regexes or are already in ${0}.": "Переводить нечего: ключи уже локализованы, являются regex или уже на языке «${0}».",
@@ -54,6 +56,8 @@
     "The current connection always sends one request at a time.": "Через текущее подключение запросы всегда идут по одному.",
     "Retries": "Повторов при ошибке",
     "Response length, tokens": "Длина ответа, токенов",
+    "Reply timeout, seconds": "Ожидание ответа, секунд",
+    "A request with no reply in this time is stopped and retried like an error. 0 means no limit.": "Если модель не ответила за это время, запрос прерывается и повторяется, как при ошибке. 0 — без ограничения.",
     "Temperature (profile only)": "Температура (только для профиля)",
     "Use structured output (JSON schema) when the API supports it": "Использовать структурированный вывод (JSON-схему), если API поддерживает",
     "Localize": "Локализовать",

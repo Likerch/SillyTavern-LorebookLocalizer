@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Translator } from '../src/translator.js';
+import { isTimeoutError, RequestTimeoutError, Translator } from '../src/translator.js';
 import { makeBatches, runPool } from '../src/batching.js';
 import { resolveLanguage } from '../src/constants.js';
 
@@ -25,6 +25,7 @@ function makeTranslator(request, extra = {}) {
     return new Translator({
         request, lang, settings: { ...settings, ...extra.settings }, concurrency: extra.concurrency ?? 2,
         countTokens, signal: extra.signal ?? new AbortController().signal, retryDelayMs: 1,
+        batchTimeoutMs: extra.batchTimeoutMs, onProgress: extra.onProgress,
     });
 }
 
@@ -44,6 +45,7 @@ test('missing ids are retried, then reported as failures', async () => {
     await tr.translate(items);
     assert.equal(tr.results.size, 5);
     assert.deepEqual(tr.failures.map(f => f.id), [6]);
+    assert.equal(tr.failures[0].kind, 'invalid');
     assert.equal(calls, 3, 'initial + 2 retries');
 });
 
@@ -95,17 +97,64 @@ test('network errors are retried and then fail the batch', async () => {
     }, { settings: { useJsonSchema: false } });
     await tr.translate(items);
     assert.equal(tr.failures.length, 6);
+    assert.ok(tr.failures.every(f => f.kind === 'error' && f.reason === '500'));
     assert.equal(calls, 3);
 });
 
-test('abort stops the run', async () => {
+test('abort stops the run: finished batches stay, the batch in flight is dropped even if the transport hangs', async () => {
     const controller = new AbortController();
-    const tr = makeTranslator(async (messages) => {
+    let calls = 0;
+    const seen = [];
+    const tr = makeTranslator(async (messages, { signal }) => {
+        calls++;
+        seen.push(signal);
+        if (calls < 3) return answerFor(messages);
         controller.abort(new Error('stopped'));
-        return answerFor(messages);
+        return new Promise(() => {});
     }, { signal: controller.signal, concurrency: 1, settings: { maxTermsPerBatch: 1 } });
     await tr.translate(items);
-    assert.equal(tr.results.size, 1, 'only the in-flight batch completes');
+    assert.equal(tr.results.size, 2, 'the first two batches');
+    assert.equal(tr.failures.length, 0, 'a stop is not a failure');
+    assert.equal(calls, 3, 'nothing is sent after the stop');
+    assert.equal(seen[2].aborted, true, 'the transport is told to stop');
+    assert.equal(seen[0].aborted, false, 'finished attempts are not aborted afterwards');
+    assert.deepEqual(tr.warnings, []);
+});
+
+test('timeout: an attempt with no reply in time is aborted and retried; a timeout keeps structured output on', async () => {
+    const attempts = [];
+    const tr = makeTranslator(async (messages, { signal, useSchema }) => {
+        attempts.push({ signal, useSchema });
+        if (attempts.length <= 2) return new Promise(() => {});
+        return answerFor(messages);
+    }, { batchTimeoutMs: 15, concurrency: 1 });
+    await tr.translate(items);
+    assert.equal(tr.results.size, 6, 'the third attempt answered');
+    assert.equal(attempts.length, 3);
+    assert.ok(attempts.slice(0, 2).every(a => a.signal.aborted && isTimeoutError(a.signal.reason)));
+    assert.ok(attempts.every(a => a.useSchema), 'a timeout does not switch off structured output');
+    assert.equal(tr.schemaFallbackUsed, false);
+});
+
+test('timeout: after the last retry the batch fails with kind timeout; progress counts it', async () => {
+    const progress = [];
+    const tr = makeTranslator(() => new Promise(() => {}), {
+        batchTimeoutMs: 10, concurrency: 1, settings: { maxRetries: 1 }, onProgress: (done, total) => progress.push([done, total]),
+    });
+    await tr.translate(items.slice(0, 2));
+    assert.equal(tr.failures.length, 2);
+    assert.ok(tr.failures.every(f => f.kind === 'timeout' && f.reason === new RequestTimeoutError(10).message));
+    assert.deepEqual(progress, [[2, 2]]);
+    assert.equal(tr.done, 2);
+});
+
+test('no timeout by default: a slow reply is waited for', async () => {
+    const tr = makeTranslator(async (messages) => {
+        await new Promise(resolve => setTimeout(resolve, 30));
+        return answerFor(messages);
+    });
+    await tr.translate(items);
+    assert.equal(tr.results.size, 6);
 });
 
 test('makeBatches respects the token and term limits', async () => {

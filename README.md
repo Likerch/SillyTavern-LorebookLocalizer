@@ -75,7 +75,9 @@ Hermione → Гермиона, Гермионы, Гермионе, Гермио�
 - **Пакеты** ограничены входными токенами и числом ключей: ответ со словоформами гораздо длиннее запроса.
 - **Structured output (JSON schema)** включается для Chat Completion. Если API схему не поддерживает, расширение само переходит на JSON в промпте.
 - **Проверка ответа:** каждый `id` должен вернуться. Недостающие записи запрашиваются повторно, обрезанный ответ делится пополам.
+- **Ожидание ответа:** запрос, на который модель не ответила за 90 секунд, прерывается и повторяется, как при ошибке. Время задаётся в «Запросах», `0` — ждать без ограничения.
 - Для «текущего подключения» используется `generateRawData`, а не `generateRaw`: так пользовательские regex-скрипты (например, замена кавычек на «ёлочки») не ломают JSON.
+- «Стоп» и таймаут прерывают только запрос самого расширения: генерация в чате и запросы других расширений не трогаются. Через текущее подключение следующий запрос не начнётся, пока не завершится предыдущий, иначе SillyTavern сбил бы пользователю длину ответа.
 
 ## Формат ключей
 
@@ -89,17 +91,35 @@ Hermione → Гермиона, Гермионы, Гермионе, Гермио�
 добавляются.
 
 ```ts
+type BusyState = { running: boolean; by?: 'dialog' | 'api' };
+
 interface LorebookLocalizerApi {
     version: 1;
+    features: string[]; // с 0.3.0: 'progress', 'cancel', 'busy', 'timeout'
     buildKeyRegex(forms: string[], options?: { boundaries?: boolean }): string | null;
     buildPlainKeys(forms: string[]): string[];
     cleanForms(forms: string[]): string[];
-    localizeEntries(book: string, uids: number[], options?: { language?: string; profileId?: string }):
-        Promise<{ added: number; entries: number; failures: number }>;
+    localizeEntries(book: string, uids: number[], options?: {
+        language?: string;
+        profileId?: string;
+        onProgress?: (progress: { phase: 'queued' | 'running' | 'saving'; done: number; total: number }) => void;
+        signal?: AbortSignal;
+        batchTimeoutMs?: number;
+    }): Promise<{
+        added: number;
+        entries: number;
+        failures: number;
+        cancelled: boolean;
+        failed: Array<{ uid: number; reason: 'timeout' | 'invalid' | 'error' }>;
+    }>;
     isProtectedBook(book: string): Promise<boolean>;
+    busy(): BusyState;
+    onBusyChange(listener: (state: BusyState) => void): () => void;
 }
 ```
 
+- `features` перечисляет то, что появилось после первой версии API, — по нему расширение проверяет, что умеет
+  установленный Localizer. В 0.3.0 добавились `progress`, `cancel`, `busy` и `timeout`.
 - `buildKeyRegex` собирает из словоформ один regex-ключ (`/…/iu`) с границами слова в Unicode, как в диалоге;
   `boundaries: false` — без границ (для языков без пробелов). `null` — форм нет.
 - `buildPlainKeys` — каждая форма отдельным обычным ключом. `cleanForms` чистит формы: пробелы, запятые, дубли
@@ -107,12 +127,43 @@ interface LorebookLocalizerApi {
 - `localizeEntries` делает то же, что диалог, но без окон: собирает ключи записей `uids` лорбука `book`, переводит
   их, строит ключи и записывает. Предпросмотра и резервной копии нет. Остальные параметры — как их выставил
   пользователь в диалоге (вторичные ключи, контекст, постоянные и выключенные записи, формат ключей, число
-  вариантов, пакеты). `language` — id языка из списка диалога (`ru`, `uk`, `de`…), `profileId` — профиль Connection
-  Manager (`''` — текущее подключение); без них берётся выбор из диалога. Возвращает, сколько ключей добавлено
-  (`added`), сколько записей их получило (`entries`) и сколько записей модель не перевела (`failures`). Лорбуки
+  вариантов, пакеты, повторы). `language` — id языка из списка диалога (`ru`, `uk`, `de`…), `profileId` — профиль
+  Connection Manager (`''` — текущее подключение); без них берётся выбор из диалога. Возвращает, сколько ключей
+  добавлено (`added`), сколько записей их получило (`entries`), сколько записей не удалось (`failures`, причины — в
+  `failed`) и была ли отмена (`cancelled`). Лорбуки
   BunnyMo, неизвестный лорбук или язык, сломанный профиль и отсутствие подключения — ошибка (Promise отклоняется).
   Диалог и API работают строго по очереди: вызов, пришедший во время другой работы, ждёт её конца.
+- `onProgress` сообщает ход работы в записях:
+  - `queued` — задача ждёт другую работу Localizer (окно или другой вызов API). Приходит сразу при вызове,
+    `total` — число запрошенных записей.
+  - `running` — идёт перевод. Первый раз приходит с `done: 0`, потом после каждого ответа модели. `total` — записи,
+    которые ушли модели (записи, где переводить нечего, не считаются), `done` — сколько из них уже готово,
+    с переводом или без.
+  - `saving` — ключи записываются в лорбук.
+
+  Исключение внутри `onProgress` задачу не ломает.
+- `signal` отменяет задачу. Запрос, который идёт в этот момент, прерывается, а готовые пакеты сохраняются.
+  Promise не отклоняется: он выполняется с `cancelled: true`. Если задача ещё ждёт очереди, она снимается сразу и
+  ничего не делает.
+- `batchTimeoutMs` — сколько ждать ответа на один запрос. По умолчанию это «Ожидание ответа» из настроек окна:
+  90 секунд, если пользователь их не менял. Запрос без ответа прерывается и считается неудачной попыткой: пауза и
+  повтор, как при ошибке. После последнего повтора записи пакета попадают в `failed` с причиной `timeout`. `0` или
+  `Infinity` — без ограничения.
+- `failed` — записи, которые не получили ключей из-за сбоя, `failures` — их число:
+  - `timeout` — модель не ответила вовремя и после повторов;
+  - `invalid` — ответ не JSON, обрезан, записи в нём нет, или ни один вариант перевода не дал корректного ключа;
+  - `error` — запрос завершился ошибкой (сеть, API).
+
+  Сбоями не считаются записи, на которые модель вернула пустой перевод, и записи, до которых не дошло из-за отмены.
+- `busy()` говорит, занят ли Localizer и кем: `dialog` — окно расширения (от нажатия «Локализовать» до конца
+  предпросмотра и записи), `api` — вызов `localizeEntries`. `onBusyChange` вызывает слушателя при каждой смене
+  состояния и возвращает функцию отписки. Между двумя задачами подряд промежуточного «свободен» нет, а состояние
+  меняется раньше, чем выполняется Promise задачи.
 - `isProtectedBook` — лорбук BunnyMo или его пак: такие через API не локализуются никогда.
+
+## История версий
+
+Изменения по версиям — в [CHANGELOG.md](CHANGELOG.md).
 
 ## Разработка
 
@@ -120,7 +171,7 @@ interface LorebookLocalizerApi {
 npm test
 ```
 
-Модули `regex-builder`, `prompt`, `batching`, `translator`, `entries`, `protected`, `exclusive`, `headless` и `api` не зависят от ST и покрыты тестами в Node. Код, работающий с ST, лежит в `connection.js`, `lorebook.js`, `ui.js` и `st.js`.
+Модули `regex-builder`, `prompt`, `batching`, `translator`, `entries`, `protected`, `exclusive`, `headless` и `api` не зависят от ST и покрыты тестами в Node. Код, работающий с ST, лежит в `connection.js`, `lorebook.js`, `ui.js` и `st.js`; запросы из `connection.js` проверяются в тестах на поддельном контексте ST.
 
 ---
 
@@ -134,6 +185,7 @@ npm test
 - A preview lets you uncheck or edit keys before anything is written. A backup is made before saving.
 - Added keys are tracked in `entry.extensions.lorebook_localizer`. Re-runs skip already translated keys, and a "remove added keys" action undoes everything.
 - Batches are sized by tokens. Structured output is used when available, with automatic fallback. Missing ids are retried and truncated replies are split.
+- A request with no reply in 90 seconds (configurable, `0` = no limit) is stopped and retried like an error. Stop and timeouts abort only the extension's own request: the chat generation and other extensions' requests are left alone.
 - BunnyMo's own lorebook and its packs are recognized by their content (tag keys such as `<SPECIES:ELF>`, the `<BunnymoTags:…>` wrapper) and shown disabled: BunnyMo matches those keys exactly as written. They can be allowed in Options.
 
 ### API for other extensions
@@ -142,24 +194,54 @@ npm test
 object; within version 1 members are only added.
 
 ```ts
+type BusyState = { running: boolean; by?: 'dialog' | 'api' };
+
 interface LorebookLocalizerApi {
     version: 1;
+    features: string[]; // since 0.3.0: 'progress', 'cancel', 'busy', 'timeout'
     buildKeyRegex(forms: string[], options?: { boundaries?: boolean }): string | null;
     buildPlainKeys(forms: string[]): string[];
     cleanForms(forms: string[]): string[];
-    localizeEntries(book: string, uids: number[], options?: { language?: string; profileId?: string }):
-        Promise<{ added: number; entries: number; failures: number }>;
+    localizeEntries(book: string, uids: number[], options?: {
+        language?: string;
+        profileId?: string;
+        onProgress?: (progress: { phase: 'queued' | 'running' | 'saving'; done: number; total: number }) => void;
+        signal?: AbortSignal;
+        batchTimeoutMs?: number;
+    }): Promise<{
+        added: number;
+        entries: number;
+        failures: number;
+        cancelled: boolean;
+        failed: Array<{ uid: number; reason: 'timeout' | 'invalid' | 'error' }>;
+    }>;
     isProtectedBook(book: string): Promise<boolean>;
+    busy(): BusyState;
+    onBusyChange(listener: (state: BusyState) => void): () => void;
 }
 ```
 
+- `features` lists what was added after the first API release, for feature detection.
 - `buildKeyRegex`, `buildPlainKeys` and `cleanForms` are the pure helpers the dialog uses.
 - `localizeEntries` runs the dialog's pipeline (collect keys → translate → build keys → write) for the given entries
   without any UI and without a backup. The user's dialog options apply; `language` is a language id from the dialog's
   list and `profileId` a Connection Manager profile id (`''` = current connection). It resolves to the number of
-  added keys, of entries that got keys and of entries the model did not translate. It rejects for BunnyMo books,
-  unknown books or languages, unusable profiles and when there is no connection. Dialog and API jobs run one at a
-  time.
+  added keys, of entries that got keys and of failed entries. It rejects for BunnyMo books, unknown books or
+  languages, unusable profiles and when there is no connection. Dialog and API jobs run one at a time.
+  - `onProgress` counts entries: `queued` comes at once when the job has to wait for another Localizer job (`total`
+    = requested entries); `running` comes with `done: 0` and after every model reply (`total` = entries sent to the
+    model, `done` = finished so far, translated or not); `saving` comes before the write.
+  - `signal` cancels: the request in flight is dropped, finished batches are still saved, and the promise resolves
+    with `cancelled: true`. A job still waiting for its turn is dropped at once.
+  - `batchTimeoutMs` (default: the dialog's reply timeout, 90 s unless the user changed it; `0` or `Infinity` = no
+    limit): a request with no reply in time counts as a failed attempt and is retried like an error.
+  - `failed` lists the entries that got no keys because something failed, with the reason: `timeout` (no reply,
+    also after the retries), `invalid` (not JSON, cut off, missing in the reply, no valid key) or `error` (the
+    request failed). `failures === failed.length`. Entries the model answered with an empty translation and entries
+    skipped by a cancel are not failures.
+- `busy()` tells whether a Localizer job runs and whose it is: `dialog` (from "Localize" until the preview is
+  applied or closed) or `api`. `onBusyChange` calls the listener on every change and returns an unsubscribe
+  function; there is no idle blink between two queued jobs, and the state changes before the job's promise settles.
 - `isProtectedBook` tells whether a lorebook is BunnyMo's or one of its packs; the API never localizes those.
 
 Install: *Extensions → Install extension →* `https://github.com/Likerch/SillyTavern-LorebookLocalizer.git`.

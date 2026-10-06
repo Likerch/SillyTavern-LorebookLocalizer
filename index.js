@@ -14,8 +14,11 @@ import { addSettingsPanel, addWorldInfoButton, confirmRemoval, openMainDialog, P
 const exclusive = createExclusive();
 
 async function onOpen() {
-    if (exclusive.busy) {
-        toastr.info(t`Lorebook Localizer is already running.`, EXTENSION_TITLE);
+    const busy = exclusive.state();
+    if (busy.running) {
+        toastr.info(busy.by === 'api'
+            ? t`Lorebook Localizer is translating entries for another extension (Maestro). Open it again when that is done.`
+            : t`Lorebook Localizer is already running.`, EXTENSION_TITLE);
         return;
     }
     const choice = await openMainDialog();
@@ -25,6 +28,10 @@ async function onOpen() {
         await exclusive.run(async () => {
             if (choice.action === 'localize') await localize(choice.books);
             if (choice.action === 'remove') await removeKeys(choice.books);
+        }, {
+            by: 'dialog',
+            // Another extension started a job while the dialog was open.
+            onQueued: () => toastr.info(t`Lorebook Localizer is finishing a job for another extension; yours starts right after it.`, EXTENSION_TITLE),
         });
     } catch (error) {
         console.error(`[${EXTENSION_TITLE}]`, error);
@@ -74,6 +81,7 @@ async function localize(books) {
         countTokens: (text) => ctx.getTokenCountAsync(text),
         signal: controller.signal,
         onProgress: (done, total) => progress.update(done, total, t`${done} of ${total} entries done`),
+        batchTimeoutMs: settings.requestTimeout * 1000,
     });
     try {
         await translator.translate(items.map(item => toPromptItem(item)));

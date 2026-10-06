@@ -290,6 +290,7 @@ export async function openMainDialog() {
         numberControl(settings, 'maxConcurrency', t`Parallel requests (profile only)`, { hint: t`The current connection always sends one request at a time.` }),
         numberControl(settings, 'maxRetries', t`Retries`),
         numberControl(settings, 'responseTokens', t`Response length, tokens`),
+        numberControl(settings, 'requestTimeout', t`Reply timeout, seconds`, { hint: t`A request with no reply in this time is stopped and retried like an error. 0 means no limit.` }),
         numberControl(settings, 'temperature', t`Temperature (profile only)`, { step: 0.05 }),
         checkboxControl(settings, 'useJsonSchema', t`Use structured output (JSON schema) when the API supports it`),
     ));

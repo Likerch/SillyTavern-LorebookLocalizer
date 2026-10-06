@@ -9,6 +9,7 @@ export const NUMBER_LIMITS = {
     maxConcurrency: [1, 8],
     maxRetries: [0, 5],
     responseTokens: [256, 65536],
+    requestTimeout: [0, 3600],
     temperature: [0, 2],
 };
 
