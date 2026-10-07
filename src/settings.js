@@ -11,6 +11,9 @@ export const NUMBER_LIMITS = {
     responseTokens: [256, 65536],
     requestTimeout: [0, 3600],
     temperature: [0, 2],
+    lbcResponseTokens: [512, 131072],
+    lbcRequestTimeout: [0, 3600],
+    lbcTemperature: [0, 2],
 };
 
 /** Tagged-template translation through SillyTavern's i18n (resolved at call time, after locales load). */

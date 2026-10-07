@@ -248,3 +248,11 @@
 .lbl-lbc-status {
     margin-bottom: 4px;
 }
+
+.lbl-lbc-options {
+    margin: 2px 0 6px 24px;
+}
+
+.lbl-lbc-unavailable {
+    opacity: 0.5;
+}

@@ -1,6 +1,8 @@
 // The LoreBook Creator section of the extension's drawer in the Extensions panel.
-import { getSettings, saveSettings, t } from '../settings.js';
+import { getProfiles } from '../connection.js';
+import { clampSetting, getSettings, NUMBER_LIMITS, saveSettings, t } from '../settings.js';
 import { LBC } from './adapter.js';
+import { LBC_PROFILE_INHERIT } from './channel-core.js';
 import { applySettings, getLbcStatus, lbcFolder, onLbcStatusChange } from './module.js';
 
 const SECTION_CLASS = 'lbl-lbc-settings';
@@ -25,6 +27,83 @@ function describeStatus(status) {
     return status.domParts
         ? { text: t`LoreBook Creator ${version} was not tested (tested: ${tested}). Everything is on at your request; if its window looks broken, turn the option below off.`, warning: true }
         : { text: t`LoreBook Creator ${version} was not tested (tested: ${tested}). Parts that depend on its window are off.`, warning: true };
+}
+
+/**
+ * A checkbox bound to a boolean setting; parts are started or stopped right away.
+ * @param {string} key
+ * @param {string} label
+ * @param {string} hint
+ */
+function partCheckbox(key, label, hint) {
+    const settings = getSettings();
+    const input = $('<input type="checkbox">').prop('checked', Boolean(settings[key]));
+    input.on('change', () => {
+        settings[key] = input.prop('checked');
+        saveSettings();
+        applySettings();
+    });
+    return $('<label class="checkbox_label lbl-option">').append(input, $('<span>').text(label)).attr('title', hint);
+}
+
+/**
+ * @param {string} key
+ * @param {string} label
+ * @param {{step?: number, hint?: string}} [options]
+ */
+function numberField(key, label, { step = 1, hint = '' } = {}) {
+    const settings = getSettings();
+    const [min, max] = NUMBER_LIMITS[key];
+    const input = $('<input type="number" class="text_pole lbl-number">').attr({ min, max, step }).val(settings[key]);
+    input.on('change', () => {
+        settings[key] = clampSetting(key, input.val());
+        input.val(settings[key]);
+        saveSettings();
+    });
+    return $('<label class="lbl-field">').append($('<span class="lbl-field-label">').text(label), input).attr('title', hint);
+}
+
+/** The profile list is read again whenever the select is opened: profiles may be added in the meantime. */
+function profileField() {
+    const settings = getSettings();
+    const select = $('<select class="text_pole">');
+    const fill = () => {
+        const profiles = getProfiles() ?? [];
+        const keysProfile = profiles.find(profile => profile.id === settings.profileId)?.name ?? t`current connection`;
+        select.empty().append(
+            $('<option>', { value: LBC_PROFILE_INHERIT, text: t`As for keys (${keysProfile})` }),
+            $('<option>', { value: '', text: t`Current connection` }),
+            ...profiles.map(profile => $('<option>', { value: profile.id, text: profile.name })),
+        );
+        const known = settings.lbcProfileId === LBC_PROFILE_INHERIT || settings.lbcProfileId === ''
+            || profiles.some(profile => profile.id === settings.lbcProfileId);
+        select.val(known ? settings.lbcProfileId : LBC_PROFILE_INHERIT);
+    };
+    fill();
+    select.on('focus mousedown', fill);
+    select.on('change', () => {
+        settings.lbcProfileId = String(select.val());
+        saveSettings();
+    });
+    return $('<label class="lbl-field">').append($('<span class="lbl-field-label">').text(t`Connection for LoreBook Creator`), select)
+        .attr('title', t`A profile sends LoreBook Creator's requests to its own model without its RP preset; the current connection uses the active API with the settings below instead of the RP preset's.`);
+}
+
+function reasoningField() {
+    const settings = getSettings();
+    const select = $('<select class="text_pole">').append(
+        $('<option>', { value: 'off', text: t`Off (none on OpenRouter)` }),
+        $('<option>', { value: 'auto', text: t`As the API decides` }),
+        $('<option>', { value: 'low', text: t`Low` }),
+        $('<option>', { value: 'medium', text: t`Medium` }),
+        $('<option>', { value: 'high', text: t`High` }),
+    ).val(settings.lbcReasoning);
+    select.on('change', () => {
+        settings.lbcReasoning = String(select.val());
+        saveSettings();
+    });
+    return $('<label class="lbl-field">').append($('<span class="lbl-field-label">').text(t`Reasoning`), select)
+        .attr('title', t`Reasoning makes lorebook JSON slower and dearer and rarely better. DeepSeek on OpenRouter reasons unless told not to.`);
 }
 
 /** @param {JQuery} drawerContent the content of the extension's drawer */
@@ -56,7 +135,20 @@ export function addLbcSettings(drawerContent) {
         applySettings();
     });
 
-    section.append(statusLine, enabledRow, untestedRow);
+    const channelRow = partCheckbox('lbcChannel', t`Clean generation channel`,
+        t`LoreBook Creator's requests go without the RP preset, the chat, lorebooks and other extensions' prompts, through the connection below.`);
+    const channelOptions = $('<div class="lbl-grid lbl-lbc-options">').append(
+        profileField(),
+        reasoningField(),
+        numberField('lbcResponseTokens', t`Max response tokens`, { step: 500, hint: t`A whole lorebook in one reply needs room: 16000 fits about 50 entries.` }),
+        numberField('lbcRequestTimeout', t`Timeout, seconds`, { step: 30, hint: t`0 = no limit.` }),
+        numberField('lbcTemperature', t`Temperature`, { step: 0.05 }),
+    );
+    const savingRow = partCheckbox('lbcSaving', t`Lossless saving`,
+        t`"Import to ST" and "Download JSON" keep the book name as typed (Cyrillic too), entry uids, other extensions' data and every field LoreBook Creator does not show. An existing book is overwritten only after asking, with a backup.`);
+    const parts = $('<div class="lbl-lbc-parts">').append(channelRow, channelOptions, savingRow);
+
+    section.append(statusLine, enabledRow, untestedRow, parts);
     drawerContent.append(section);
 
     /** @param {import('./module.js').LbcStatus} status */
@@ -65,6 +157,8 @@ export function addLbcSettings(drawerContent) {
         statusLine.text(text).toggleClass('lbl-warning', warning).attr('title', status.name ? `${lbcFolder()} · ${status.compat}` : '');
         enabledRow.toggle(status.state === 'ready');
         untestedRow.toggle(status.state === 'ready' && status.compat !== 'tested');
+        parts.toggle(status.active);
+        savingRow.toggleClass('lbl-lbc-unavailable', !status.domParts).attr('aria-disabled', String(!status.domParts));
     };
     render(getLbcStatus());
     onLbcStatusChange(render);

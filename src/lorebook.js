@@ -80,13 +80,22 @@ export async function collectItems(bookNames, settings, lang, { uids = null, ski
     return { items, stats };
 }
 
-function timestamp() {
+/** Date and time for backup names: `2026-10-07 14-05`. */
+export function timestamp() {
     const d = new Date();
     const pad = (n) => String(n).padStart(2, '0');
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}-${pad(d.getMinutes())}`;
 }
 
-async function backupBook(book, data, mode, stamp, report) {
+/**
+ * Saves a copy of a book before it is changed: a new book (`copy`) or a downloaded JSON (`download`).
+ * @param {string} book
+ * @param {any} data
+ * @param {'download'|'copy'|'none'} mode
+ * @param {string} stamp
+ * @param {{backups: string[]}} report receives the backup's name
+ */
+export async function backupBook(book, data, mode, stamp, report) {
     if (mode === 'none') return;
     const ctx = SillyTavern.getContext();
     const snapshot = structuredClone(data);

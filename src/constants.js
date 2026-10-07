@@ -37,6 +37,18 @@ export const DEFAULT_SETTINGS = Object.freeze({
     lbcEnabled: true,
     /** Run the parts that rely on LBC's markup and texts on a version they were not checked against. */
     lbcAllowUntested: false,
+    /** LBC's requests go without the RP context, through lbcProfileId (src/lbc/channel.js). */
+    lbcChannel: true,
+    /** Connection Manager profile id for LBC; '@localizer' = the one chosen for keys (profileId), '' = current connection. */
+    lbcProfileId: '@localizer',
+    /** 'off' (none on OpenRouter) | 'auto' (the API's default) | 'low' | 'medium' | 'high' */
+    lbcReasoning: 'off',
+    lbcResponseTokens: 16000,
+    /** Seconds; a whole book can take minutes. 0 = no limit. */
+    lbcRequestTimeout: 600,
+    lbcTemperature: 0.8,
+    /** "Import to ST" and "Download JSON" keep everything LBC drops (src/lbc/saving.js). */
+    lbcSaving: true,
 });
 
 const SLAVIC_CASES = (cases) => `List all ${cases} cases in the singular and, for countable common nouns, in the plural. `

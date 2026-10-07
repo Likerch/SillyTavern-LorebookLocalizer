@@ -1,0 +1,83 @@
+// The clean generation channel for LoreBook Creator: pure parts, unit-tested in Node. The SillyTavern side is channel.js.
+import { unwrapLbcPrompt } from './adapter.js';
+
+/** `lbcProfileId` value meaning "the profile chosen for key translation". */
+export const LBC_PROFILE_INHERIT = '@localizer';
+
+/** Property put on SillyTavern's generate_data of an LBC request, so the fetch wrapper recognizes exactly that request. */
+export const ROUTE_MARK = '__lorebookLocalizerLbc';
+
+/** The chat completion endpoint SillyTavern's own generations go to. */
+export const CHAT_COMPLETION_URL = '/api/backends/chat-completions/generate';
+
+/**
+ * The system message of every LBC request. LBC's own prompt carries the task; this only replaces the roleplay frame
+ * the prompt was written for.
+ */
+export const BASE_RULES = [
+    'You are a worldbuilding assistant that writes SillyTavern World Info (lorebook) data.',
+    'This is not a roleplay turn: do not continue any story, do not add trackers, image tags or commentary.',
+    'Follow the request below exactly and answer in the format it asks for. When it asks for JSON, output only that JSON.',
+    'Keep SillyTavern macros such as {{user}} and {{char}} exactly as written.',
+].join('\n');
+
+/**
+ * @param {{lbcProfileId?: string, profileId?: string}} settings
+ * @returns {string} a Connection Manager profile id, or '' for the current connection
+ */
+export function resolveLbcProfileId(settings) {
+    const own = settings.lbcProfileId ?? LBC_PROFILE_INHERIT;
+    return own === LBC_PROFILE_INHERIT ? String(settings.profileId ?? '') : String(own);
+}
+
+/**
+ * The `reasoning_effort` to send. Without the profile's preset (or with the RP preset's own setting) DeepSeek on
+ * OpenRouter reasons by default, which only makes JSON slower and dearer; OpenRouter takes 'none' as given.
+ * @param {string} mode `off` | `auto` | `low` | `medium` | `high`
+ * @param {string|undefined} api the API or chat completion source (`openrouter`, …)
+ * @returns {string|undefined} undefined: leave the request as it is
+ */
+export function reasoningEffort(mode, api) {
+    if (mode === 'auto') return undefined;
+    if (mode === 'off' || !mode) return api === 'openrouter' ? 'none' : undefined;
+    return mode;
+}
+
+/**
+ * @param {string} rawPrompt LBC's quiet prompt before SillyTavern substituted macros in it
+ * @param {string[]} [extraRules] added to the system message (language rules of a later stage)
+ * @returns {{role: 'system'|'user', content: string}[]}
+ */
+export function buildMessages(rawPrompt, extraRules = []) {
+    const system = [BASE_RULES, ...extraRules.filter(Boolean)].join('\n\n');
+    return [
+        { role: 'system', content: system },
+        { role: 'user', content: unwrapLbcPrompt(rawPrompt) },
+    ];
+}
+
+/**
+ * A non-streamed chat completion body that SillyTavern's `extractMessageFromData` reads.
+ * @param {string} content
+ */
+export function completionBody(content) {
+    return { choices: [{ index: 0, message: { role: 'assistant', content }, finish_reason: 'stop' }] };
+}
+
+/**
+ * An error body: SillyTavern shows `error.message` in a toast and the generation fails, so LBC reports an error
+ * instead of an empty result.
+ * @param {string} message
+ */
+export function errorBody(message) {
+    return { error: { message } };
+}
+
+/**
+ * @param {string} text
+ * @param {number} [limit]
+ */
+export function excerpt(text, limit = 160) {
+    const flat = String(text ?? '').replace(/\s+/g, ' ').trim();
+    return flat.length > limit ? `${flat.slice(0, limit)}…` : flat;
+}

@@ -3,7 +3,9 @@
 import { EXTENSION_TITLE } from '../constants.js';
 import { getSettings } from '../settings.js';
 import { getLbcApi, LBC } from './adapter.js';
+import { channelPart } from './channel.js';
 import { compatibility, findLbcExtension, thirdPartyNames } from './compat.js';
+import { savingPart } from './saving.js';
 import { createScope } from './scope.js';
 
 /** LBC exposes its API at the end of an async start; this is how long we wait for it after SillyTavern is ready. */
@@ -34,8 +36,8 @@ const API_POLL_MS = 500;
  * @property {(scope: Scope, env: LbcEnv) => void} start
  */
 
-/** @type {LbcPart[]} The parts, in start order. Later stages add them here. */
-const PARTS = [];
+/** @type {LbcPart[]} The parts, in start order. */
+const PARTS = [channelPart, savingPart];
 
 /** @type {Omit<LbcStatus, 'active'|'domParts'>} */
 let found = { state: 'searching' };
