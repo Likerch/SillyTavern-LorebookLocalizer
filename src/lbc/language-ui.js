@@ -8,6 +8,8 @@ import { CONTENT_LANGUAGES } from './language.js';
 const SELECT_CLASS = 'lbl-lbc-language';
 /** Class on <html> while the language is fixed; style.css hides LBC's "To English" under it. */
 const FIXED_CLASS = 'lbl-lbc-language-fixed';
+/** The part runs (the channel is on): only then the language rules apply and "To English" may be hidden. */
+let running = false;
 
 /** @returns {Record<string, string>} */
 export function contentLanguageLabels() {
@@ -20,7 +22,7 @@ export function contentLanguageLabels() {
 
 function syncPageClass() {
     const language = getSettings().lbcContentLanguage;
-    document.documentElement.classList.toggle(FIXED_CLASS, language === 'en' || language === 'ru');
+    document.documentElement.classList.toggle(FIXED_CLASS, running && (language === 'en' || language === 'ru'));
 }
 
 /** @type {import('./module.js').LbcPart} */
@@ -46,8 +48,12 @@ export const languagePart = {
         else header.append(select);
         scope.add(() => select.remove());
 
+        running = true;
         syncPageClass();
-        scope.add(() => document.documentElement.classList.remove(FIXED_CLASS));
+        scope.add(() => {
+            running = false;
+            document.documentElement.classList.remove(FIXED_CLASS);
+        });
     },
 };
 

@@ -55,6 +55,8 @@ test('LBC reply check: its lenient parseJSON and the shape each prompt asks for'
     assert.equal(lbcReplyProblem('simpleGenerate', '{"worldName":"X","entries":[]}'), null);
     assert.equal(lbcReplyProblem('regenerateEntry', '{"comment":"A","content":"a"}'), null);
     assert.equal(lbcReplyProblem('autoCategorize', '{"entries":[]}'), 'shape');
+    assert.equal(lbcReplyProblem('autoCategorize', '[{"index":0,"category":"Character"}]'), null, 'LBC takes a bare array');
+    assert.equal(lbcReplyProblem('mergePair', '{"entries":[{"pair":0,"content":"x"}]}'), null, 'LBC falls back to entries');
     assert.equal(lbcReplyProblem('llmEdit', '{}'), null, 'no changes is a valid edit');
     assert.equal(lbcReplyProblem('enhanceField', 'A longer text.'), null);
     assert.equal(lbcReplyProblem('unknown', 'anything'), null);

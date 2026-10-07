@@ -2,7 +2,7 @@
 // (the model lists every word form, regex keys are built and checked, the user reviews them) runs on World Info copies
 // of the editor entries. The added keys go back into the editor; the copies, with Localizer's marker, become the
 // entries' originals for lossless saving, so the keys and the marker reach the saved book.
-import { EXTENSION_TITLE, resolveLanguage } from '../constants.js';
+import { EXTENSION_TITLE, MARKER_KEY, resolveLanguage } from '../constants.js';
 import { createRequestFn, resolveConnection } from '../connection.js';
 import { applyToEntry, buildProposals, collectEntryTerms, contextExcerpt, toPromptItem } from '../entries.js';
 import { getSettings, t } from '../settings.js';
@@ -141,9 +141,13 @@ export async function localizeEditorEntries({ data, indices, exclusive }) {
             entry.key = [...copy.key];
             entry.keysecondary = [...copy.keysecondary];
             const link = entryLinks.get(entry);
-            if (Number.isInteger(link?.raw?.uid)) copy.uid = link.raw.uid;
-            else delete copy.uid;
-            entryLinks.set(entry, { raw: copy, source: link?.source ?? 'lbc:editor' });
+            if (link?.raw) {
+                // The original stays the load-time snapshot (saving compares against it); the marker travels apart.
+                entryLinks.set(entry, { ...link, marker: copy.extensions?.[MARKER_KEY] });
+            } else {
+                delete copy.uid;
+                entryLinks.set(entry, { raw: copy, source: 'lbc:editor' });
+            }
             keys += added;
             changed++;
         }

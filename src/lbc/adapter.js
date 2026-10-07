@@ -160,9 +160,11 @@ const REPLY_SHAPES = {
     generateFromParents: isEntry,
     regenerateEntry: isEntry,
     enhanceEntry: isEntry,
-    autoCategorize: (v) => isList(v.assignments),
+    // LBC also takes a bare array here.
+    autoCategorize: (v) => Array.isArray(v) || isList(v.assignments),
     mergeAnalyze: (v) => isList(v.pairs) || isList(v.notes),
-    mergePair: (v) => isList(v.merged),
+    // LBC falls back to `entries` here.
+    mergePair: (v) => isList(v.merged) || isList(v.entries),
     optimizeKeys: (v) => isList(v.patches) || isList(v.duplicates) || isList(v.contradictions),
 };
 

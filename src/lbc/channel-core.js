@@ -81,3 +81,32 @@ export function excerpt(text, limit = 160) {
     const flat = String(text ?? '').replace(/\s+/g, ' ').trim();
     return flat.length > limit ? `${flat.slice(0, limit)}…` : flat;
 }
+
+/**
+ * A piece of LBC's prompt that survives SillyTavern's macro substitution: its first line, cut before any `{{macro}}`.
+ * Used to tell LBC's request from any other one that happens to be prepared at the same time.
+ * @param {string} rawPrompt
+ */
+export function promptProbe(rawPrompt) {
+    const firstLine = String(rawPrompt ?? '').trim().split('\n')[0];
+    const macro = firstLine.indexOf('{{');
+    return (macro >= 0 ? firstLine.slice(0, macro) : firstLine).slice(0, 100).trim();
+}
+
+/**
+ * Whether a prepared chat carries the prompt the probe came from.
+ * @param {unknown[]} chat
+ * @param {string} probe
+ */
+export function chatHasPrompt(chat, probe) {
+    if (!probe || !Array.isArray(chat)) return false;
+    return chat.some(message => typeof message?.content === 'string' && message.content.includes(probe));
+}
+
+/**
+ * OpenAI reasoning models take no temperature (SillyTavern removes it for them; sending it fails the request).
+ * @param {unknown} model
+ */
+export function rejectsTemperature(model) {
+    return /^(?:o\d|gpt-5)/i.test(String(model ?? '').replace(/^openai\//i, ''));
+}

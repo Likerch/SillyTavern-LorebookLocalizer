@@ -100,7 +100,6 @@
     "Also on an untested version": "Включать и на непроверенной версии",
     "Parts that depend on LoreBook Creator's window and texts were checked against specific versions only. On another version they may miss buttons or texts.": "Части, завязанные на окно и тексты LoreBook Creator, проверены только на определённых версиях. На другой версии они могут не найти кнопки или тексты.",
     "LoreBook Creator: the connection profile cannot be used (${0}). Using the current connection.": "LoreBook Creator: профиль подключения недоступен (${0}). Запрос идёт через текущее подключение.",
-    "LoreBook Creator: the clean channel needs a Chat Completion connection or a connection profile. Its requests go out as before.": "LoreBook Creator: чистому каналу нужно подключение Chat Completion или профиль подключения. Пока запросы уходят по-старому.",
     "LoreBook Creator: the model returned an empty reply.": "LoreBook Creator: модель вернула пустой ответ.",
     "LoreBook Creator: the model did not answer with JSON: «${0}». The full reply is in the browser console.": "LoreBook Creator: модель ответила не в JSON: «${0}». Полный ответ — в консоли браузера.",
     "LoreBook Creator: no reply within ${0} s. The limit is in the Lorebook Localizer settings.": "LoreBook Creator: нет ответа за ${0} с. Лимит меняется в настройках Lorebook Localizer.",
@@ -124,7 +123,7 @@
     "0 = no limit.": "0 — без ограничения.",
     "Temperature": "Температура",
     "Lossless saving": "Сохранение без потерь",
-    "\"Import to ST\" and \"Download JSON\" keep the book name as typed (Cyrillic too), entry uids, other extensions' data and every field LoreBook Creator does not show. An existing book is overwritten only after asking, with a backup.": "«Import to ST» и «Download JSON» сохраняют название книги как есть (и кириллицу), uid записей, данные других расширений и все поля, которых нет в LoreBook Creator. Существующая книга перезаписывается только после вопроса и с бэкапом.",
+    "\"Import to ST\" and \"Download JSON\" keep the book name as typed (Cyrillic too), entry uids, other extensions' data and every field LoreBook Creator does not show. An existing book is overwritten only after asking, with a backup.": "«Сохранить в ST» и «Скачать JSON» в LoreBook Creator сохраняют название книги как есть (и кириллицу), uid записей, данные других расширений и все поля, которых нет в LoreBook Creator. Существующая книга перезаписывается только после вопроса и с бэкапом.",
     "No entries to save.": "Сохранять нечего: записей нет.",
     "\"${0}\" saved: ${1} entries (${2} unchanged, ${3} changed, ${4} new).": "«${0}» сохранён: записей — ${1} (без изменений — ${2}, изменено — ${3}, новых — ${4}).",
     "Backup: ${0}": "Бэкап: ${0}",
@@ -165,5 +164,6 @@
     "Never": "Никогда",
     "Word forms before saving to ST": "Словоформы перед сохранением в ST",
     "When some entries have keys without Russian word forms, \"Import to ST\" can add them first (the model, then your review).": "Если у части записей ключи без русских словоформ, «Сохранить в ST» может сначала добавить их (модель, затем ваша проверка).",
-    "Buttons in LoreBook Creator that translate entry keys and add every Russian word form with this extension's own pipeline and preview, plus a Russian section in its key audit.": "Кнопки в LoreBook Creator, которые переводят ключи записей и добавляют все русские словоформы — тем же конвейером и предпросмотром, что у Lorebook Localizer, — и русский раздел в его аудите ключей."
+    "Buttons in LoreBook Creator that translate entry keys and add every Russian word form with this extension's own pipeline and preview, plus a Russian section in its key audit.": "Кнопки в LoreBook Creator, которые переводят ключи записей и добавляют все русские словоформы — тем же конвейером и предпросмотром, что у Lorebook Localizer, — и русский раздел в его аудите ключей.",
+    "LoreBook Creator: the clean channel works while SillyTavern uses Chat Completion. Its requests go out as before.": "LoreBook Creator: чистый канал работает, пока SillyTavern использует Chat Completion. Сейчас запросы уходят по-старому."
 }

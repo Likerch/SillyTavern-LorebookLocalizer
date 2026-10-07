@@ -82,7 +82,8 @@ export const draftPart = {
 
         async function save() {
             const draft = snapshotDraft(data);
-            const json = draft ? JSON.stringify(draft.fields) + JSON.stringify(draft.entries) : '';
+            // Links change on their own too (a save, a finished match after a load): they count as a change.
+            const json = draft ? JSON.stringify({ ...draft, savedAt: 0 }) : '';
             if (json === lastJson) return;
             lastJson = json;
             if (draft) await store.setItem(STORE_KEY, draft);

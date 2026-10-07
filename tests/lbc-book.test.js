@@ -126,3 +126,35 @@ test('pairing a load: the loaded entries are the tail of the list and must match
     assert.deepEqual(pairLoadedEntries([loaded(rawList[0])], rawList, () => false), [], 'shorter than the book');
     assert.deepEqual(pairLoadedEntries(list, rawList, entry => entry === list[1]).map(p => p.raw.uid), [1], 'already linked entries are skipped');
 });
+
+test('overwriting the book an entry came from: edits made in SillyTavern since the load are kept', () => {
+    const raw = { uid: 5, comment: 'Anna', content: 'A smuggler.', key: ['Anna'], depth: 0, scanDepth: null, extensions: { maestro: 1 } };
+    const current = { ...structuredClone(raw), key: ['Anna', '/анн(?:а|ы)/iu'], scanDepth: 3, extensions: { maestro: 2, lorebook_localizer: { languages: {} } } };
+    const untouched = loaded(raw);
+    const kept = toWorldInfoEntry(untouched, { raw, source: 'st:Book' }, TEMPLATE, current);
+    assert.equal(kept.kind, 'kept');
+    assert.deepEqual(kept.entry, current, 'nothing changed in LBC: the book keeps its newer entry');
+    const edited = { ...loaded(raw), content: 'Anna runs the smugglers.' };
+    const { entry } = toWorldInfoEntry(edited, { raw, source: 'st:Book' }, TEMPLATE, current);
+    assert.equal(entry.content, 'Anna runs the smugglers.');
+    assert.deepEqual(entry.key, current.key);
+    assert.equal(entry.scanDepth, 3);
+    assert.deepEqual(entry.extensions, current.extensions);
+
+    const existing = { entries: { 5: current } };
+    const { data } = buildBook([edited], () => ({ raw, source: 'st:Book' }), { target: 'Book', template: TEMPLATE, existing });
+    assert.equal(data.entries[5].scanDepth, 3, 'buildBook passes the current entry of the same book');
+    const copy = buildBook([edited], () => ({ raw, source: 'st:Book' }), { target: 'Copy', template: TEMPLATE, existing: null });
+    assert.equal(copy.data.entries[5].scanDepth, null, 'a copy starts from the load-time original');
+});
+
+test('word forms added in the editor reach the book through the link marker', () => {
+    const raw = { uid: 1, comment: 'Anna', content: 'x', key: ['Anna'], extensions: { maestro: 1 } };
+    const marker = { version: 1, languages: { ru: { language: 'Russian', sources: ['Anna'], added: { key: ['/анн(?:а|ы)/iu'], keysecondary: [] } } } };
+    const editor = { ...loaded(raw), key: ['Anna', '/анн(?:а|ы)/iu'] };
+    const { entry, kind } = toWorldInfoEntry(editor, { raw, source: 'st:Book', marker }, TEMPLATE);
+    assert.equal(kind, 'updated');
+    assert.deepEqual(entry.key, ['Anna', '/анн(?:а|ы)/iu']);
+    assert.deepEqual(entry.extensions.lorebook_localizer, marker);
+    assert.equal(entry.extensions.maestro, 1);
+});

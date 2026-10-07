@@ -49,6 +49,12 @@ test('replies: categories fixed in books, single entries, auto-categorize and me
     assert.equal(assignments.assignments[0].category, 'Location');
     assert.equal(canonicalizeReplyCategories({ merged: [{ pair: 0, category: 'Organization' }] }), 0);
     assert.equal(canonicalizeReplyCategories(null), 0);
+    const bare = [{ index: 0, category: 'Персонаж' }];
+    assert.equal(canonicalizeReplyCategories(bare), 1, 'a bare array (auto-categorize) too');
+    assert.equal(bare[0].category, 'Character');
+    const own = { entries: [{ category: 'Легенды' }, { category: 'Легенда' }] };
+    assert.equal(canonicalizeReplyCategories(own, ['легенды']), 1, 'the user\'s own category stays');
+    assert.deepEqual(own.entries.map(e => e.category), ['Легенды', 'Lore / Legend']);
 });
 
 test('prompts: "same language" sentences give way to the chosen language; idea mode leaves them', () => {

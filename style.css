@@ -264,11 +264,24 @@
 
 /* LoreBook Creator: the language switch in its header; "To English" is pointless with a fixed language. */
 .lbl-lbc-language {
+    flex: 0 1 210px;
+    min-width: 0;
     width: auto;
-    max-width: 210px;
     margin: 0 4px 0 auto;
     padding: 2px 6px;
     font-size: 0.85em;
+    text-overflow: ellipsis;
+}
+
+/* LBC's own header buttons keep their size next to the switch. */
+.lbl-lbc-language ~ .lbc-hdr-btn {
+    flex-shrink: 0;
+}
+
+@media (max-width: 600px) {
+    .lbl-lbc-language {
+        flex-basis: 120px;
+    }
 }
 
 .lbl-lbc-language-fixed #lbc-tr-idea {

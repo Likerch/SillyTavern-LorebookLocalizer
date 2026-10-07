@@ -11,8 +11,9 @@ import { LBC_ENTRY_FIELDS, lbcEntryText, normalizeLikeLbc } from './adapter.js';
 
 /**
  * @typedef {object} EntryLink where an editor entry came from
- * @property {any} raw a copy of the original World Info entry
- * @property {string} source `st:<book name>` or `file:<file name>`
+ * @property {any} raw a copy of the original World Info entry, as it was when LBC loaded it
+ * @property {string} source `st:<book name>`, `file:<file name>` or `lbc:editor` (made in the editor)
+ * @property {any} [marker] Lorebook Localizer's marker for the word forms added to the entry in the editor
  */
 
 /**
@@ -146,19 +147,27 @@ export function reconcileLocalizedKeys(out) {
  * @param {any} entry an LBC editor entry
  * @param {EntryLink|undefined} link
  * @param {object} template SillyTavern's `newWorldInfoEntryTemplate`
+ * @param {any} [current] the same entry as the book holds it now, when saving over the book it was loaded from: the
+ *        base for everything LBC did not change, so edits made in SillyTavern since the load (keys localized there,
+ *        other extensions' data) are kept
  * @returns {{entry: any, kind: 'kept'|'updated'|'added'}}
  */
-export function toWorldInfoEntry(entry, link, template) {
+export function toWorldInfoEntry(entry, link, template, current = null) {
     if (link?.raw) {
-        const out = structuredClone(link.raw);
+        const base = current ?? link.raw;
+        const out = structuredClone(base);
         const changed = changedFields(entry, link.raw);
         for (const field of changed) out[field] = exportValue(field, entry);
+        if (link.marker) {
+            if (!out.extensions || typeof out.extensions !== 'object') out.extensions = {};
+            out.extensions[MARKER_KEY] = structuredClone(link.marker);
+        }
         if (changed.includes('key') || changed.includes('keysecondary')) reconcileLocalizedKeys(out);
         // An entry moved to @depth needs a role; LBC writes system there.
         if (out.position === 4 && !Number.isInteger(out.role)) out.role = 0;
-        applyCategory(out, entry, link.raw);
-        const categoryChanged = !sameValue(out.category, link.raw.category);
-        return { entry: out, kind: changed.length || categoryChanged ? 'updated' : 'kept' };
+        applyCategory(out, entry, base);
+        const categoryChanged = !sameValue(out.category, base.category);
+        return { entry: out, kind: changed.length || categoryChanged || link.marker ? 'updated' : 'kept' };
     }
 
     const out = structuredClone(template);
@@ -187,6 +196,7 @@ export function toWorldInfoEntry(entry, link, template) {
 export function buildBook(entries, linkOf, { target, template, existing = null }) {
     const sameSource = `st:${target}`;
     const reserved = new Set(Object.values(existing?.entries ?? {}).map(entry => entry?.uid).filter(Number.isInteger));
+    const existingByUid = new Map(Object.values(existing?.entries ?? {}).filter(entry => Number.isInteger(entry?.uid)).map(entry => [entry.uid, entry]));
     const used = new Set();
     // New uids go after every uid in play, so a new entry never takes the uid a linked entry further down will claim.
     const linkedUids = entries.map(entry => linkOf(entry)?.raw?.uid).filter(Number.isInteger);
@@ -205,7 +215,8 @@ export function buildBook(entries, linkOf, { target, template, existing = null }
 
     for (const entry of entries) {
         const link = linkOf(entry);
-        const built = toWorldInfoEntry(entry, link, template);
+        const current = link?.source === sameSource && Number.isInteger(link.raw?.uid) ? existingByUid.get(link.raw.uid) : null;
+        const built = toWorldInfoEntry(entry, link, template, current);
         const own = Number.isInteger(link?.raw?.uid) ? link.raw.uid : null;
         let uid;
         if (own !== null && !used.has(own) && (link.source === sameSource || !reserved.has(own))) {

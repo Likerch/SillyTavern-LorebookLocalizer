@@ -12,8 +12,8 @@ import { EXTENSION_TITLE } from '../constants.js';
 import { getSettings, t } from '../settings.js';
 import { classifyLbcPrompt, isLbcGenerating, isLbcPrompt, lbcExpectsJson, lbcParseJson, lbcReplyProblem, showLbcStatus } from './adapter.js';
 import {
-    buildMessages, CHAT_COMPLETION_URL, completionBody, errorBody, excerpt, reasoningEffort, resolveLbcProfileId,
-    ROUTE_MARK,
+    buildMessages, CHAT_COMPLETION_URL, chatHasPrompt, completionBody, errorBody, excerpt, promptProbe, reasoningEffort,
+    rejectsTemperature, resolveLbcProfileId, ROUTE_MARK,
 } from './channel-core.js';
 import { addFetchHandler } from './fetch-hook.js';
 import { applyContentLanguage, canonicalizeReplyCategories, languageRules } from './language.js';
@@ -22,10 +22,20 @@ import { applyContentLanguage, canonicalizeReplyCategories, languageRules } from
  * @typedef {object} LbcJob
  * @property {string} id
  * @property {string} raw LBC's prompt as LBC wrote it
+ * @property {string} probe a macro-free piece of it, to recognize the prepared chat
  * @property {string} kind
- * @property {{id: string, name: string, api?: string}|null} profile null: the current connection
+ * @property {{id: string, name: string, api?: string, model?: string}|null} profile null: the current connection
  * @property {number} started
+ * @property {boolean} lorebooksCleared
+ * @property {string|null} system our system message, once the prompt was replaced
  */
+
+/** A pending request older than this is dropped (its generation ended without reaching the request). */
+const PENDING_MS = 60_000;
+/** LBC's World Info scan follows its start within this time; a later scan belongs to someone else. */
+const SCAN_MS = 10_000;
+/** A marked request that never reached fetch is forgotten after this time. */
+const JOB_MS = 10 * 60_000;
 
 /**
  * @param {object} body
@@ -70,34 +80,47 @@ export const channelPart = {
 
         /** @returns {LbcJob['profile']|undefined} undefined: the channel cannot be used for this request */
         const pickProfile = () => {
+            // Read every time: the user may switch between Chat and Text Completion while LBC is open.
+            if (SillyTavern.getContext().mainApi !== 'openai') {
+                warnOnce('api', t`LoreBook Creator: the clean channel works while SillyTavern uses Chat Completion. Its requests go out as before.`);
+                return undefined;
+            }
             const profileId = resolveLbcProfileId(getSettings());
             if (profileId) {
                 try {
                     const profile = ctx.ConnectionManagerRequestService.getProfile(profileId);
                     ctx.ConnectionManagerRequestService.validateProfile(profile);
-                    return { id: profile.id, name: profile.name, api: profile.api };
+                    return { id: profile.id, name: profile.name, api: profile.api, model: profile.model };
                 } catch (error) {
                     warnOnce(`profile:${profileId}`, t`LoreBook Creator: the connection profile cannot be used (${error?.message ?? error}). Using the current connection.`);
                 }
             }
-            if (ctx.mainApi !== 'openai') {
-                warnOnce('api', t`LoreBook Creator: the clean channel needs a Chat Completion connection or a connection profile. Its requests go out as before.`);
-                return undefined;
-            }
             return null;
         };
 
+        /** The pending request, unless it went stale (its Generate returned early, without ENDED/STOPPED). */
+        const current = () => {
+            if (pending && Date.now() - pending.started > PENDING_MS) pending = null;
+            return pending;
+        };
+
+        // Only LBC's own generation starts a job; other generations leave a pending LBC request alone. Every later step
+        // checks that the data really is that request's, since other generations (and generateRaw, which fires the
+        // prompt events without GENERATION_STARTED) may be prepared at the same time.
         scope.on(eventSource, eventTypes.GENERATION_STARTED, (type, options, dryRun) => {
-            pending = null;
             if (type !== 'quiet' || dryRun || !isLbcGenerating() || !isLbcPrompt(options?.quiet_prompt)) return;
+            pending = null;
             const profile = pickProfile();
             if (profile === undefined) return;
             pending = {
                 id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`,
                 raw: options.quiet_prompt,
+                probe: promptProbe(options.quiet_prompt),
                 kind: classifyLbcPrompt(options.quiet_prompt),
                 profile,
                 started: Date.now(),
+                lorebooksCleared: false,
+                system: null,
             };
             env.log('request', pending.kind, profile ? `profile «${profile.name}»` : 'current connection');
             // Extensions loaded after this one may also have registered as "last" (Maestro does): be last for this request.
@@ -105,30 +128,39 @@ export const channelPart = {
         });
 
         // Last, so lists filled by other listeners are emptied too. Nothing is scanned, no timers start in the chat.
+        // The scan carries no sign of whose it is: only the first one soon after LBC's start is taken.
         const onEntriesLoaded = (lists) => {
-            if (!pending || !lists) return;
+            const job = current();
+            if (!job || job.lorebooksCleared || job.system || !lists || Date.now() - job.started > SCAN_MS) return;
+            job.lorebooksCleared = true;
             for (const list of Object.values(lists)) {
                 if (Array.isArray(list)) list.splice(0);
             }
         };
 
         const onPromptReady = (data) => {
-            if (!pending || data?.dryRun || !Array.isArray(data?.chat)) return;
+            const job = current();
+            if (!job || job.system || data?.dryRun || !chatHasPrompt(data?.chat, job.probe)) return;
             const language = getSettings().lbcContentLanguage;
-            data.chat.splice(0, data.chat.length, ...buildMessages(applyContentLanguage(pending.raw, language), languageRules(language)));
+            const messages = buildMessages(applyContentLanguage(job.raw, language), languageRules(language));
+            job.system = messages[0].content;
+            data.chat.splice(0, data.chat.length, ...messages);
         };
 
         const onSettingsReady = (data) => {
-            if (!pending || !data) return;
-            const job = pending;
+            const job = current();
+            if (!job?.system || !data || data.messages?.[0]?.content !== job.system) return;
             pending = null;
+            for (const [id, old] of jobs) if (Date.now() - old.started > JOB_MS) jobs.delete(id);
             jobs.set(job.id, job);
             data[ROUTE_MARK] = job.id;
             if (job.profile) return;
-            // The current connection: LBC's own sampling settings instead of the RP preset's.
+            // The current connection: LBC's own settings instead of the RP preset's. SillyTavern has already adapted
+            // the request to the model (reasoning models take max_completion_tokens and no temperature): keep that.
             const settings = getSettings();
-            data.max_tokens = settings.lbcResponseTokens;
-            data.temperature = settings.lbcTemperature;
+            if ('max_completion_tokens' in data) data.max_completion_tokens = settings.lbcResponseTokens;
+            else data.max_tokens = settings.lbcResponseTokens;
+            if ('temperature' in data) data.temperature = settings.lbcTemperature;
             const effort = reasoningEffort(settings.lbcReasoning, data.chat_completion_source);
             if (effort !== undefined) data.reasoning_effort = effort;
         };
@@ -140,10 +172,6 @@ export const channelPart = {
             [eventTypes.CHAT_COMPLETION_SETTINGS_READY, onSettingsReady],
         ];
         for (const [event, listener] of lastListeners) scope.onLast(eventSource, event, listener);
-
-        const forget = () => { pending = null; };
-        scope.on(eventSource, eventTypes.GENERATION_ENDED, forget);
-        scope.on(eventSource, eventTypes.GENERATION_STOPPED, forget);
 
         scope.add(addFetchHandler((request, next) => {
             const body = request.init?.body;
@@ -185,7 +213,7 @@ export const channelPart = {
                 let response;
                 let content;
                 if (job.profile) {
-                    const override = { temperature: settings.lbcTemperature };
+                    const override = rejectsTemperature(job.profile.model) ? {} : { temperature: settings.lbcTemperature };
                     const effort = reasoningEffort(settings.lbcReasoning, job.profile.api);
                     if (effort !== undefined) override.reasoning_effort = effort;
                     const result = await ctx.ConnectionManagerRequestService.sendRequest(
@@ -220,7 +248,8 @@ export const channelPart = {
                 // A model writing Russian may still name categories in Russian: LBC needs its English names.
                 if (lbcExpectsJson(job.kind)) {
                     const value = lbcParseJson(content);
-                    const fixed = canonicalizeReplyCategories(value);
+                    const custom = env.api()?.getData()?.customCategories;
+                    const fixed = canonicalizeReplyCategories(value, Array.isArray(custom) ? custom : []);
                     if (fixed) {
                         env.log('categories renamed', fixed);
                         return jsonResponse(completionBody(JSON.stringify(value)));

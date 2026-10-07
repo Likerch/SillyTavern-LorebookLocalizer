@@ -50,28 +50,37 @@ for (const [category, names] of Object.entries(RUSSIAN_CATEGORIES)) {
 /**
  * LBC's English category for a Russian (or differently written) name, or the name unchanged (a real custom category).
  * @param {unknown} name
+ * @param {Iterable<string>} [custom] the user's own categories (LBC's customCategories): never renamed
  */
-export function canonicalCategory(name) {
+export function canonicalCategory(name, custom = []) {
     if (typeof name !== 'string') return name;
-    return CATEGORY_INDEX.get(fold(name)) ?? name;
+    const folded = fold(name);
+    for (const own of custom) if (fold(own) === folded) return name;
+    return CATEGORY_INDEX.get(folded) ?? name;
 }
 
 /**
  * Puts LBC's English names into every category of a parsed reply (books, single entries, auto-categorize, merges).
  * @param {any} value the parsed JSON reply
+ * @param {Iterable<string>} [custom] the user's own categories, kept as they are
  * @returns {number} how many categories changed
  */
-export function canonicalizeReplyCategories(value) {
+export function canonicalizeReplyCategories(value, custom = []) {
     let changed = 0;
+    const own = [...custom];
     const fix = (item) => {
         if (!item || typeof item !== 'object' || typeof item.category !== 'string') return;
-        const canonical = canonicalCategory(item.category);
+        const canonical = canonicalCategory(item.category, own);
         if (canonical !== item.category) {
             item.category = canonical;
             changed++;
         }
     };
     if (!value || typeof value !== 'object') return 0;
+    if (Array.isArray(value)) {
+        value.forEach(fix);
+        return changed;
+    }
     fix(value);
     for (const list of [value.entries, value.assignments, value.merged]) {
         if (Array.isArray(list)) list.forEach(fix);
