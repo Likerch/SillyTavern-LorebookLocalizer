@@ -234,3 +234,17 @@
         flex-basis: 100%;
     }
 }
+
+.lbl-lbc-settings {
+    margin-top: 10px;
+    padding-top: 6px;
+    border-top: 1px solid var(--SmartThemeBorderColor, rgba(128, 128, 128, 0.3));
+}
+
+.lbl-lbc-title {
+    margin: 0 0 4px;
+}
+
+.lbl-lbc-status {
+    margin-bottom: 4px;
+}

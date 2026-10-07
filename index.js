@@ -4,6 +4,8 @@ import { createRequestFn, resolveConnection } from './src/connection.js';
 import { buildProposals } from './src/entries.js';
 import { createExclusive } from './src/exclusive.js';
 import { createHeadless } from './src/headless.js';
+import { startLbcModule } from './src/lbc/module.js';
+import { addLbcSettings } from './src/lbc/panel.js';
 import { applyChanges, collectItems, removeAddedKeys, toPromptItem } from './src/lorebook.js';
 import { getSettings, t } from './src/settings.js';
 import { parseRegexFromString } from './src/st.js';
@@ -133,6 +135,8 @@ function init() {
     getSettings();
     addWorldInfoButton(onOpen);
     addSettingsPanel(onOpen);
+    addLbcSettings($('.lorebook-localizer-settings .inline-drawer-content'));
+    startLbcModule();
 }
 
 // The API for other extensions (Maestro); the regex helpers work without SillyTavern being ready.

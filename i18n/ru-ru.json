@@ -86,5 +86,17 @@
     "BunnyMo books and packs (marked) are not localized: BunnyMo matches their tag keys exactly as written. They can be allowed in Options.": "Лорбуки и паки BunnyMo (с пометкой) не локализуются: BunnyMo ищет их ключи-теги ровно в том виде, как они записаны. Разрешить их можно в «Параметрах».",
     "BunnyMo": "BunnyMo",
     "Allow BunnyMo books and packs (not recommended)": "Разрешить лорбуки и паки BunnyMo (не рекомендуется)",
-    "Translated keys in BunnyMo packs only add false triggers. Turn it on to remove keys added to them earlier.": "Переведённые ключи в паках BunnyMo дают только ложные срабатывания. Включите, чтобы убрать ключи, добавленные в них раньше."
+    "Translated keys in BunnyMo packs only add false triggers. Turn it on to remove keys added to them earlier.": "Переведённые ключи в паках BunnyMo дают только ложные срабатывания. Включите, чтобы убрать ключи, добавленные в них раньше.",
+    "Looking for LoreBook Creator…": "Ищем LoreBook Creator…",
+    "LoreBook Creator is not installed or is disabled.": "LoreBook Creator не установлен или выключен.",
+    "LoreBook Creator ${0} is installed but did not start. Reload the page; if it stays like this, see the browser console.": "LoreBook Creator ${0} установлен, но не запустился. Перезагрузите страницу; если не поможет — смотрите консоль браузера.",
+    "LoreBook Creator ${0} found. Russian support is off.": "Найден LoreBook Creator ${0}. Русская поддержка выключена.",
+    "LoreBook Creator ${0}: Russian support is on.": "LoreBook Creator ${0}: русская поддержка включена.",
+    "LoreBook Creator ${0} was not tested (tested: ${1}). Everything is on at your request; if its window looks broken, turn the option below off.": "LoreBook Creator ${0} не проверялся (проверены: ${1}). По вашему выбору включено всё; если окно LoreBook Creator выглядит сломанным, выключите галочку ниже.",
+    "LoreBook Creator ${0} was not tested (tested: ${1}). Parts that depend on its window are off.": "LoreBook Creator ${0} не проверялся (проверены: ${1}). Части, которые зависят от его окна, выключены.",
+    "LoreBook Creator": "LoreBook Creator",
+    "Russian support for LoreBook Creator": "Русская поддержка LoreBook Creator",
+    "Russian interface, a clean and cheap generation channel, Russian keys and lossless saving for the LoreBook Creator extension.": "Русский интерфейс, чистый и дешёвый канал генерации, русские ключи и сохранение без потерь для расширения LoreBook Creator.",
+    "Also on an untested version": "Включать и на непроверенной версии",
+    "Parts that depend on LoreBook Creator's window and texts were checked against specific versions only. On another version they may miss buttons or texts.": "Части, завязанные на окно и тексты LoreBook Creator, проверены только на определённых версиях. На другой версии они могут не найти кнопки или тексты."
 }

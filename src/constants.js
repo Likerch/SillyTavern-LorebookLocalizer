@@ -33,6 +33,10 @@ export const DEFAULT_SETTINGS = Object.freeze({
     lastSelectedBooks: [],
     /** BunnyMo books and packs are skipped by the dialog unless this is on (the API never localizes them). */
     localizeProtected: false,
+    /** Russian support for LoreBook Creator (src/lbc/). Does nothing while LBC is not installed. */
+    lbcEnabled: true,
+    /** Run the parts that rely on LBC's markup and texts on a version they were not checked against. */
+    lbcAllowUntested: false,
 });
 
 const SLAVIC_CASES = (cases) => `List all ${cases} cases in the singular and, for countable common nouns, in the plural. `

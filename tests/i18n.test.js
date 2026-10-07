@@ -7,7 +7,7 @@ const root = new URL('..', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '
 
 /** Collects every t`...` template as SillyTavern's i18n key (`${expr}` → `${index}`). */
 export function extractKeys() {
-    const files = ['index.js', ...readdirSync(join(root, 'src')).map(f => join('src', f))].filter(f => f.endsWith('.js'));
+    const files = ['index.js', ...readdirSync(join(root, 'src'), { recursive: true }).map(f => join('src', String(f)))].filter(f => f.endsWith('.js'));
     const keys = new Set();
     for (const file of files) {
         const source = readFileSync(join(root, file), 'utf8');
