@@ -79,6 +79,22 @@ Hermione → Гермиона, Гермионы, Гермионе, Гермио�
 - Для «текущего подключения» используется `generateRawData`, а не `generateRaw`: так пользовательские regex-скрипты (например, замена кавычек на «ёлочки») не ломают JSON.
 - «Стоп» и таймаут прерывают только запрос самого расширения: генерация в чате и запросы других расширений не трогаются. Через текущее подключение следующий запрос не начнётся, пока не завершится предыдущий, иначе SillyTavern сбил бы пользователю длину ответа.
 
+## LoreBook Creator по-русски
+
+Если рядом установлен [LoreBook Creator](https://github.com/virgilianshailer/lorebook-creator), Localizer делает его
+удобным для русского RP (проверено с LBC 1.15.0):
+
+- **чистый канал**: запросы LBC идут без RP-пресета, истории чата, лорбуков и вставок других расширений — через
+  выбранный профиль, без рассуждений, с ошибкой вместо молча стёртого редактора;
+- **язык записей**: английский с русскими ключами, русский или как в идее; категории всегда понятны LBC;
+- **сохранение без потерь**: русские названия книг, вопрос перед перезаписью, бэкап, сохранённые uid, данные
+  других расширений и все поля, которых LBC не знает;
+- **русские ключи**: словоформы для записей прямо в редакторе LBC и русский раздел в его аудите;
+- **русский интерфейс** и **черновик**, который переживает перезагрузку страницы.
+
+Подробно — в [docs/lorebook-creator.md](docs/lorebook-creator.md). Настройки — в разделе «LoreBook Creator» блока
+Lorebook Localizer в Extensions.
+
 ## Формат ключей
 
 - **Regex (рекомендуется)** — один ключ на вариант перевода.
@@ -173,6 +189,13 @@ npm test
 
 Модули `regex-builder`, `prompt`, `batching`, `translator`, `entries`, `protected`, `exclusive`, `headless` и `api` не зависят от ST и покрыты тестами в Node. Код, работающий с ST, лежит в `connection.js`, `lorebook.js`, `ui.js` и `st.js`; запросы из `connection.js` проверяются в тестах на поддельном контексте ST.
 
+Поддержка LoreBook Creator — в `src/lbc/`: всё знание о LBC собрано в `adapter.js`, чистая логика (`book`, `language`, `audit-ru`, `dictionary`, `channel-core`, `compat`, `scope`, `fetch-hook`) покрыта тестами. Часть тестов читает исходник LBC из `vendor/lorebook-creator` (в git не входит; без него они пропускаются):
+
+```bash
+git clone https://github.com/virgilianshailer/lorebook-creator vendor/lorebook-creator
+node tools/extract-lbc-strings.mjs   # сверка словаря интерфейса с исходником LBC
+```
+
 ---
 
 ## English
@@ -187,6 +210,16 @@ npm test
 - Batches are sized by tokens. Structured output is used when available, with automatic fallback. Missing ids are retried and truncated replies are split.
 - A request with no reply in 90 seconds (configurable, `0` = no limit) is stopped and retried like an error. Stop and timeouts abort only the extension's own request: the chat generation and other extensions' requests are left alone.
 - BunnyMo's own lorebook and its packs are recognized by their content (tag keys such as `<SPECIES:ELF>`, the `<BunnymoTags:…>` wrapper) and shown disabled: BunnyMo matches those keys exactly as written. They can be allowed in Options.
+
+### LoreBook Creator
+
+With [LoreBook Creator](https://github.com/virgilianshailer/lorebook-creator) installed (checked with 1.15.0), the
+extension makes it fit a Russian roleplay: LBC's requests go through a clean channel (no RP preset, chat, lorebooks
+or other extensions' prompts; a chosen Connection Manager profile; no reasoning; an error instead of a wiped editor
+on an unusable reply), entries are written in a chosen language with LBC's English categories kept, "Import to ST" /
+"Download JSON" keep Cyrillic names, uids, other extensions' data and every field LBC drops, "Russian keys" buttons
+add every word form with this extension's pipeline, and LBC's interface is translated while SillyTavern's is Russian.
+Details (in Russian): [docs/lorebook-creator.md](docs/lorebook-creator.md).
 
 ### API for other extensions
 
