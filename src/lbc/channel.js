@@ -2,19 +2,21 @@
 // roleplay turn: the RP preset, the chat, every active lorebook (which also starts sticky/cooldown timers in the chat)
 // and the prompts of other extensions, with LBC's request glued to the end. For LBC's requests only, this part
 // - empties the lorebook lists, so World Info is not even scanned;
-// - replaces the prompt with a system message and LBC's own prompt, taken before SillyTavern substituted {{user}};
+// - replaces the prompt with a system message and LBC's own prompt, taken before SillyTavern substituted {{user}},
+//   with the chosen language of the entries (language.js);
 // - sends the request through the chosen Connection Manager profile without its preset (or through the current
 //   connection with LBC's response length, temperature and reasoning settings);
 // - turns an empty reply, or one LBC gets nothing out of, into an error. LBC would report "0 entries generated!"
 //   and replace the whole editor with those 0 entries.
 import { EXTENSION_TITLE } from '../constants.js';
 import { getSettings, t } from '../settings.js';
-import { classifyLbcPrompt, isLbcGenerating, isLbcPrompt, lbcReplyProblem, showLbcStatus } from './adapter.js';
+import { classifyLbcPrompt, isLbcGenerating, isLbcPrompt, lbcExpectsJson, lbcParseJson, lbcReplyProblem, showLbcStatus } from './adapter.js';
 import {
     buildMessages, CHAT_COMPLETION_URL, completionBody, errorBody, excerpt, reasoningEffort, resolveLbcProfileId,
     ROUTE_MARK,
 } from './channel-core.js';
 import { addFetchHandler } from './fetch-hook.js';
+import { applyContentLanguage, canonicalizeReplyCategories, languageRules } from './language.js';
 
 /**
  * @typedef {object} LbcJob
@@ -112,7 +114,8 @@ export const channelPart = {
 
         const onPromptReady = (data) => {
             if (!pending || data?.dryRun || !Array.isArray(data?.chat)) return;
-            data.chat.splice(0, data.chat.length, ...buildMessages(pending.raw));
+            const language = getSettings().lbcContentLanguage;
+            data.chat.splice(0, data.chat.length, ...buildMessages(applyContentLanguage(pending.raw, language), languageRules(language)));
         };
 
         const onSettingsReady = (data) => {
@@ -213,6 +216,15 @@ export const channelPart = {
                     return failure(problem === 'shape'
                         ? t`LoreBook Creator: the model answered with JSON of another shape: «${excerpt(content)}». Nothing was changed; the full reply is in the browser console.`
                         : t`LoreBook Creator: the model did not answer with JSON: «${excerpt(content)}». The full reply is in the browser console.`, 502);
+                }
+                // A model writing Russian may still name categories in Russian: LBC needs its English names.
+                if (lbcExpectsJson(job.kind)) {
+                    const value = lbcParseJson(content);
+                    const fixed = canonicalizeReplyCategories(value);
+                    if (fixed) {
+                        env.log('categories renamed', fixed);
+                        return jsonResponse(completionBody(JSON.stringify(value)));
+                    }
                 }
                 return response;
             } catch (error) {

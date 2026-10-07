@@ -7,6 +7,7 @@ import { channelPart } from './channel.js';
 import { compatibility, findLbcExtension, thirdPartyNames } from './compat.js';
 import { draftPart } from './draft.js';
 import { interfacePart } from './interface.js';
+import { languagePart } from './language-ui.js';
 import { savingPart } from './saving.js';
 import { createScope } from './scope.js';
 
@@ -39,7 +40,7 @@ const API_POLL_MS = 500;
  */
 
 /** @type {LbcPart[]} The parts, in start order: the draft is put back after saving starts tracking entries. */
-const PARTS = [channelPart, savingPart, draftPart, interfacePart];
+const PARTS = [channelPart, languagePart, savingPart, draftPart, interfacePart];
 
 /** @type {Omit<LbcStatus, 'active'|'domParts'>} */
 let found = { state: 'searching' };

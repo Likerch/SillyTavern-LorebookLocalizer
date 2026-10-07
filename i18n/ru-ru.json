@@ -139,5 +139,11 @@
     "LoreBook Creator's window, settings and questions in Russian while SillyTavern's interface is Russian. Its machine translation button is hidden.": "Окно, настройки и вопросы LoreBook Creator — по-русски, пока интерфейс SillyTavern русский. Кнопка машинного перевода скрыта.",
     "Keep the draft across reloads": "Черновик между перезагрузками",
     "LoreBook Creator keeps its editor in memory only. The draft is stored in this browser and comes back after a page reload.": "LoreBook Creator держит редактор только в памяти. Черновик хранится в этом браузере и возвращается после перезагрузки страницы.",
-    "LoreBook Creator: the unsaved work was restored (${0} entries).": "LoreBook Creator: несохранённая работа восстановлена (записей: ${0})."
+    "LoreBook Creator: the unsaved work was restored (${0} entries).": "LoreBook Creator: несохранённая работа восстановлена (записей: ${0}).",
+    "Entries in English, keys also in Russian": "Записи на английском, ключи и по-русски",
+    "Entries in Russian": "Записи на русском",
+    "Language of the idea (as LoreBook Creator does)": "Язык идеи (как в LoreBook Creator)",
+    "Language of the entries LoreBook Creator writes": "На каком языке LoreBook Creator пишет записи",
+    "Language of entries": "Язык записей",
+    "What LoreBook Creator writes in. English entries are the model's strongest and cheapest; their keys get Russian forms too. Categories always keep LoreBook Creator's English names.": "На каком языке LoreBook Creator пишет записи. Английский — самый сильный и дешёвый язык модели, а ключи всё равно получают русские формы. Категории всегда остаются английскими названиями LoreBook Creator."
 }

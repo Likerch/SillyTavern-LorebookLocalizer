@@ -3,6 +3,8 @@ import { getProfiles } from '../connection.js';
 import { clampSetting, getSettings, NUMBER_LIMITS, saveSettings, t } from '../settings.js';
 import { LBC } from './adapter.js';
 import { LBC_PROFILE_INHERIT } from './channel-core.js';
+import { CONTENT_LANGUAGES } from './language.js';
+import { contentLanguageLabels, syncContentLanguageClass } from './language-ui.js';
 import { applySettings, getLbcStatus, lbcFolder, onLbcStatusChange } from './module.js';
 
 const SECTION_CLASS = 'lbl-lbc-settings';
@@ -106,6 +108,23 @@ function reasoningField() {
         .attr('title', t`Reasoning makes lorebook JSON slower and dearer and rarely better. DeepSeek on OpenRouter reasons unless told not to.`);
 }
 
+function contentLanguageField() {
+    const settings = getSettings();
+    const labels = contentLanguageLabels();
+    const select = $('<select class="text_pole">');
+    for (const language of CONTENT_LANGUAGES) select.append($('<option>', { value: language, text: labels[language] }));
+    select.val(settings.lbcContentLanguage);
+    // The same setting has a switch in LoreBook Creator's header.
+    select.on('focus mousedown', () => select.val(getSettings().lbcContentLanguage));
+    select.on('change', () => {
+        settings.lbcContentLanguage = String(select.val());
+        saveSettings();
+        syncContentLanguageClass();
+    });
+    return $('<label class="lbl-field">').append($('<span class="lbl-field-label">').text(t`Language of entries`), select)
+        .attr('title', t`What LoreBook Creator writes in. English entries are the model's strongest and cheapest; their keys get Russian forms too. Categories always keep LoreBook Creator's English names.`);
+}
+
 /** @param {JQuery} drawerContent the content of the extension's drawer */
 export function addLbcSettings(drawerContent) {
     if (!drawerContent.length || drawerContent.find(`.${SECTION_CLASS}`).length) return;
@@ -138,6 +157,7 @@ export function addLbcSettings(drawerContent) {
     const channelRow = partCheckbox('lbcChannel', t`Clean generation channel`,
         t`LoreBook Creator's requests go without the RP preset, the chat, lorebooks and other extensions' prompts, through the connection below.`);
     const channelOptions = $('<div class="lbl-grid lbl-lbc-options">').append(
+        contentLanguageField(),
         profileField(),
         reasoningField(),
         numberField('lbcResponseTokens', t`Max response tokens`, { step: 500, hint: t`A whole lorebook in one reply needs room: 16000 fits about 50 entries.` }),

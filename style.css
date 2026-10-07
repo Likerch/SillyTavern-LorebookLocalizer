@@ -261,3 +261,16 @@
 .lbl-lbc-ru #lbc-h-tr {
     display: none !important;
 }
+
+/* LoreBook Creator: the language switch in its header; "To English" is pointless with a fixed language. */
+.lbl-lbc-language {
+    width: auto;
+    max-width: 210px;
+    margin: 0 4px 0 auto;
+    padding: 2px 6px;
+    font-size: 0.85em;
+}
+
+.lbl-lbc-language-fixed #lbc-tr-idea {
+    display: none !important;
+}

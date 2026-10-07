@@ -26,6 +26,9 @@ export const LBC = Object.freeze({
         translateButton: '#lbc-h-tr',
         /** "To English" next to the Simple-mode idea box. */
         translateIdea: '#lbc-tr-idea',
+        /** The panel header (title and buttons; LBC never re-renders it) and its "Reset" button. */
+        header: '#lbc-panel .lbc-header',
+        resetButton: '#lbc-h-reset',
         /** LLM Edit, Merge Workspace, Optimizer, Lorebook from lore. */
         modals: Object.freeze(['#lbc-le-modal', '#lbc-mg-modal', '#lbc-opt-modal', '#lbc-fl-modal']),
         /** "Import to ST" in the footer and on the Export tab (both run `doUIImport`, bound on `document`). */

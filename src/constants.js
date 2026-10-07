@@ -47,6 +47,8 @@ export const DEFAULT_SETTINGS = Object.freeze({
     /** Seconds; a whole book can take minutes. 0 = no limit. */
     lbcRequestTimeout: 600,
     lbcTemperature: 0.8,
+    /** Language of what LBC writes: 'en' (keys also in Russian) | 'ru' | 'idea' (LBC's own: the idea's language). */
+    lbcContentLanguage: 'en',
     /** "Import to ST" and "Download JSON" keep everything LBC drops (src/lbc/saving.js). */
     lbcSaving: true,
     /** LBC's editor survives page reloads (src/lbc/draft.js). */
