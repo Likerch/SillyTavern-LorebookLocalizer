@@ -34,8 +34,31 @@ export const LBC = Object.freeze({
         downloadButton: '.lbc-exp-json',
         /** The hidden file input behind "Load LoreBook". */
         loadBookInput: '#lbc-file-loadbook',
+        /** Everything LBC shows: the panel, the four windows, its block in Extensions, the chat-bar button. */
+        uiRoots: '#lbc-panel, #lbc-le-modal, #lbc-mg-modal, #lbc-opt-modal, #lbc-fl-modal, #lbc-settings, #lbc-trigger',
+        /** Where LBC puts those roots (the panel and windows go straight into <body>). */
+        uiContainers: 'body, #extensions_settings2, #extensions_settings, #leftSendForm, #send_form',
+        /** Elements that show book data, not interface: never translated. */
+        uiData: [
+            'input', 'textarea', '#lbc-ed-parent-add option:not([value=""])',
+            '.lbc-entry-title', '.lbc-entry-keys', '.lbc-entry-content-preview', '.lbc-parent-chip', '.lbc-custom-cat',
+            '.lbc-del-custom-cat', '.lbc-opt-reason', '.lbc-opt-diff', '.lbc-opt-patch b',
+            '.lbc-mg-pv b', '.lbc-mg-snippet', '.lbc-mg-note', '.lbc-mg-slot-name', '.lbc-mg-uniq b',
+            '.lbc-fl-etitle', '.lbc-fl-etext',
+        ].join(', '),
     }),
 });
+
+/**
+ * The editor state worth keeping across page reloads (LBC keeps it in memory only). Its own machine translation
+ * (`_translated`, `_trL`, `_orig*` of entries) and transient UI state are left out.
+ */
+export const LBC_DRAFT_FIELDS = Object.freeze([
+    'mode', 'activeTab', 'simpleIdea', 'worldName', 'worldDescription', 'era', 'eraCustom', 'worldType', 'worldScale',
+    'userRole', 'userRoleDescription', 'tone', 'themes', 'mainConflict', 'geography', 'factions', 'magicSystem',
+    'techLevel', 'history', 'coreRules', 'entries', 'customCategories', 'templateData', 'templateName', 'locked',
+    'categoryFilter', '_origWorldName', '_loadedWorld',
+]);
 
 /**
  * Every LBC prompt (18 in `PROMPTS`, `PROMPTS.optimizeKeys` and two inline ones) is wrapped in `[OOC: … ]`.
@@ -232,6 +255,11 @@ export function lbcEntryText(entry) {
         comment: entry._origComment || entry.comment || '',
         content: entry._origContent || entry.content || '',
     };
+}
+
+/** Whether LBC's panel is open (its `togglePanel` adds `lbc-open`). */
+export function isLbcPanelOpen() {
+    return $(LBC.selectors.panel).hasClass('lbc-open');
 }
 
 /**

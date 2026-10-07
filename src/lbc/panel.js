@@ -146,7 +146,11 @@ export function addLbcSettings(drawerContent) {
     );
     const savingRow = partCheckbox('lbcSaving', t`Lossless saving`,
         t`"Import to ST" and "Download JSON" keep the book name as typed (Cyrillic too), entry uids, other extensions' data and every field LoreBook Creator does not show. An existing book is overwritten only after asking, with a backup.`);
-    const parts = $('<div class="lbl-lbc-parts">').append(channelRow, channelOptions, savingRow);
+    const interfaceRow = partCheckbox('lbcInterface', t`Russian interface`,
+        t`LoreBook Creator's window, settings and questions in Russian while SillyTavern's interface is Russian. Its machine translation button is hidden.`);
+    const draftRow = partCheckbox('lbcDraft', t`Keep the draft across reloads`,
+        t`LoreBook Creator keeps its editor in memory only. The draft is stored in this browser and comes back after a page reload.`);
+    const parts = $('<div class="lbl-lbc-parts">').append(channelRow, channelOptions, savingRow, interfaceRow, draftRow);
 
     section.append(statusLine, enabledRow, untestedRow, parts);
     drawerContent.append(section);
@@ -158,7 +162,7 @@ export function addLbcSettings(drawerContent) {
         enabledRow.toggle(status.state === 'ready');
         untestedRow.toggle(status.state === 'ready' && status.compat !== 'tested');
         parts.toggle(status.active);
-        savingRow.toggleClass('lbl-lbc-unavailable', !status.domParts).attr('aria-disabled', String(!status.domParts));
+        for (const row of [savingRow, interfaceRow]) row.toggleClass('lbl-lbc-unavailable', !status.domParts).attr('aria-disabled', String(!status.domParts));
     };
     render(getLbcStatus());
     onLbcStatusChange(render);

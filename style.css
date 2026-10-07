@@ -256,3 +256,8 @@
 .lbl-lbc-unavailable {
     opacity: 0.5;
 }
+
+/* LoreBook Creator in Russian: its machine translation button (Chat Translation) is not needed. */
+.lbl-lbc-ru #lbc-h-tr {
+    display: none !important;
+}

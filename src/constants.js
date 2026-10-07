@@ -49,6 +49,10 @@ export const DEFAULT_SETTINGS = Object.freeze({
     lbcTemperature: 0.8,
     /** "Import to ST" and "Download JSON" keep everything LBC drops (src/lbc/saving.js). */
     lbcSaving: true,
+    /** LBC's editor survives page reloads (src/lbc/draft.js). */
+    lbcDraft: true,
+    /** LBC's interface in Russian while SillyTavern's is (src/lbc/interface.js). */
+    lbcInterface: true,
 });
 
 const SLAVIC_CASES = (cases) => `List all ${cases} cases in the singular and, for countable common nouns, in the plural. `

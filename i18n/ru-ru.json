@@ -134,5 +134,10 @@
     "Overwrite it with the editor's entries? Entries that are not in the editor are removed from the book. A backup is made as set in Lorebook Localizer.": "Перезаписать его записями из редактора? Записи, которых нет в редакторе, из книги пропадут. Бэкап делается так, как настроено в Lorebook Localizer.",
     "Save as a copy": "Сохранить копией",
     "Overwrite": "Перезаписать",
-    "LoreBook Creator: the model answered with JSON of another shape: «${0}». Nothing was changed; the full reply is in the browser console.": "LoreBook Creator: модель ответила JSON-ом не той формы: «${0}». Ничего не изменено; полный ответ — в консоли браузера."
+    "LoreBook Creator: the model answered with JSON of another shape: «${0}». Nothing was changed; the full reply is in the browser console.": "LoreBook Creator: модель ответила JSON-ом не той формы: «${0}». Ничего не изменено; полный ответ — в консоли браузера.",
+    "Russian interface": "Русский интерфейс",
+    "LoreBook Creator's window, settings and questions in Russian while SillyTavern's interface is Russian. Its machine translation button is hidden.": "Окно, настройки и вопросы LoreBook Creator — по-русски, пока интерфейс SillyTavern русский. Кнопка машинного перевода скрыта.",
+    "Keep the draft across reloads": "Черновик между перезагрузками",
+    "LoreBook Creator keeps its editor in memory only. The draft is stored in this browser and comes back after a page reload.": "LoreBook Creator держит редактор только в памяти. Черновик хранится в этом браузере и возвращается после перезагрузки страницы.",
+    "LoreBook Creator: the unsaved work was restored (${0} entries).": "LoreBook Creator: несохранённая работа восстановлена (записей: ${0})."
 }

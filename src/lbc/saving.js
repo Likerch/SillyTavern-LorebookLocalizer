@@ -9,6 +9,7 @@ import { getSettings, t } from '../settings.js';
 import { download, newWorldInfoEntryTemplate } from '../st.js';
 import { LBC, lbcRawEntryList, showLbcStatus } from './adapter.js';
 import { buildBook, freeBookName, pairLoadedEntries, sanitizeBookName } from './book.js';
+import { entryLinks as links } from './links.js';
 
 const OVERWRITE = 1;
 const COPY = 2;
@@ -28,8 +29,6 @@ export const savingPart = {
             return;
         }
 
-        /** @type {WeakMap<object, import('./book.js').EntryLink>} */
-        const links = new WeakMap();
         /**
          * The file picked in "Load LoreBook", read by us too. It waits for the list LBC builds from it and is dropped
          * once used, or after PENDING_FILE_MS (the pick was cancelled or LBC rejected the file).
