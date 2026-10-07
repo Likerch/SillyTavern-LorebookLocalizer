@@ -9,6 +9,7 @@ import { getSettings, t } from '../settings.js';
 import { download, newWorldInfoEntryTemplate } from '../st.js';
 import { LBC, lbcRawEntryList, showLbcStatus } from './adapter.js';
 import { buildBook, freeBookName, pairLoadedEntries, sanitizeBookName } from './book.js';
+import { russianKeysBeforeSave } from './keys-ui.js';
 import { entryLinks as links } from './links.js';
 
 const OVERWRITE = 1;
@@ -161,11 +162,12 @@ export const savingPart = {
         };
 
         async function saveToSillyTavern() {
-            const entries = [...current];
-            if (!entries.length) {
+            if (!current.length) {
                 showLbcStatus(t`No entries to save.`, 'error');
                 return;
             }
+            if (!(await russianKeysBeforeSave(lbc, env.deps.exclusive))) return;
+            const entries = [...current];
             const names = ctx.getWorldInfoNames();
             let target = wantedName();
             if (names.includes(target)) {

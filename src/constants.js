@@ -55,6 +55,10 @@ export const DEFAULT_SETTINGS = Object.freeze({
     lbcDraft: true,
     /** LBC's interface in Russian while SillyTavern's is (src/lbc/interface.js). */
     lbcInterface: true,
+    /** Russian word-form keys for LBC's entries through this extension (src/lbc/keys.js). */
+    lbcKeys: true,
+    /** Before "Import to ST": 'ask' | 'always' | 'never' add the missing word forms. */
+    lbcKeysOnSave: 'ask',
 });
 
 const SLAVIC_CASES = (cases) => `List all ${cases} cases in the singular and, for countable common nouns, in the plural. `

@@ -136,7 +136,7 @@ function init() {
     addWorldInfoButton(onOpen);
     addSettingsPanel(onOpen);
     addLbcSettings($('.lorebook-localizer-settings .inline-drawer-content'));
-    startLbcModule();
+    startLbcModule({ exclusive });
 }
 
 // The API for other extensions (Maestro); the regex helpers work without SillyTavern being ready.

@@ -7,6 +7,7 @@ import { channelPart } from './channel.js';
 import { compatibility, findLbcExtension, thirdPartyNames } from './compat.js';
 import { draftPart } from './draft.js';
 import { interfacePart } from './interface.js';
+import { keysPart } from './keys-ui.js';
 import { languagePart } from './language-ui.js';
 import { savingPart } from './saving.js';
 import { createScope } from './scope.js';
@@ -27,8 +28,12 @@ const API_POLL_MS = 500;
  * @property {boolean} active the module runs (LBC found and the module switched on)
  * @property {boolean} domParts parts that rely on LBC's markup and texts may run
  *
+ * @typedef {object} LbcDeps what the rest of the extension lends the module
+ * @property {ReturnType<import('../exclusive.js').createExclusive>} [exclusive] one Localizer job at a time
+ *
  * @typedef {object} LbcEnv
  * @property {LbcStatus} status
+ * @property {LbcDeps} deps
  * @property {() => ReturnType<typeof getLbcApi>} api
  * @property {(...args: any[]) => void} log
  *
@@ -40,7 +45,7 @@ const API_POLL_MS = 500;
  */
 
 /** @type {LbcPart[]} The parts, in start order: the draft is put back after saving starts tracking entries. */
-const PARTS = [channelPart, languagePart, savingPart, draftPart, interfacePart];
+const PARTS = [channelPart, languagePart, savingPart, draftPart, keysPart, interfacePart];
 
 /** @type {Omit<LbcStatus, 'active'|'domParts'>} */
 let found = { state: 'searching' };
@@ -51,6 +56,8 @@ const running = new Map();
 /** @type {Set<(status: LbcStatus) => void>} */
 const listeners = new Set();
 let started = false;
+/** @type {LbcDeps} */
+let deps = {};
 
 const log = (...args) => console.debug(`[${EXTENSION_TITLE}] LBC:`, ...args);
 
@@ -84,10 +91,14 @@ function notify() {
     }
 }
 
-/** Looks for LBC once SillyTavern has loaded every extension. Safe to call more than once. */
-export function startLbcModule() {
+/**
+ * Looks for LBC once SillyTavern has loaded every extension. Safe to call more than once.
+ * @param {LbcDeps} [lent]
+ */
+export function startLbcModule(lent = {}) {
     if (started) return;
     started = true;
+    deps = lent;
     const { eventSource, eventTypes } = SillyTavern.getContext();
     // APP_READY fires for late listeners too, and by then every enabled extension has its <script> in the page.
     eventSource.once(eventTypes.APP_READY, () => {
@@ -140,7 +151,7 @@ export function applySettings() {
     }
     const status = getLbcStatus();
     /** @type {LbcEnv} */
-    const env = { status, api: () => getLbcApi(), log };
+    const env = { status, deps, api: () => getLbcApi(), log };
     for (const part of PARTS) {
         const on = Boolean(settings[part.setting]) && (!part.needsDom || status.domParts);
         const scope = running.get(part.id);

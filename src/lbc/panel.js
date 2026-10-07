@@ -125,6 +125,21 @@ function contentLanguageField() {
         .attr('title', t`What LoreBook Creator writes in. English entries are the model's strongest and cheapest; their keys get Russian forms too. Categories always keep LoreBook Creator's English names.`);
 }
 
+function keysOnSaveField() {
+    const settings = getSettings();
+    const select = $('<select class="text_pole">').append(
+        $('<option>', { value: 'ask', text: t`Ask` }),
+        $('<option>', { value: 'always', text: t`Always add` }),
+        $('<option>', { value: 'never', text: t`Never` }),
+    ).val(settings.lbcKeysOnSave);
+    select.on('change', () => {
+        settings.lbcKeysOnSave = String(select.val());
+        saveSettings();
+    });
+    return $('<label class="lbl-field">').append($('<span class="lbl-field-label">').text(t`Word forms before saving to ST`), select)
+        .attr('title', t`When some entries have keys without Russian word forms, "Import to ST" can add them first (the model, then your review).`);
+}
+
 /** @param {JQuery} drawerContent the content of the extension's drawer */
 export function addLbcSettings(drawerContent) {
     if (!drawerContent.length || drawerContent.find(`.${SECTION_CLASS}`).length) return;
@@ -170,7 +185,10 @@ export function addLbcSettings(drawerContent) {
         t`LoreBook Creator's window, settings and questions in Russian while SillyTavern's interface is Russian. Its machine translation button is hidden.`);
     const draftRow = partCheckbox('lbcDraft', t`Keep the draft across reloads`,
         t`LoreBook Creator keeps its editor in memory only. The draft is stored in this browser and comes back after a page reload.`);
-    const parts = $('<div class="lbl-lbc-parts">').append(channelRow, channelOptions, savingRow, interfaceRow, draftRow);
+    const keysRow = partCheckbox('lbcKeys', t`Russian keys`,
+        t`Buttons in LoreBook Creator that translate entry keys and add every Russian word form with this extension's own pipeline and preview, plus a Russian section in its key audit.`);
+    const keysOptions = $('<div class="lbl-grid lbl-lbc-options">').append(keysOnSaveField());
+    const parts = $('<div class="lbl-lbc-parts">').append(channelRow, channelOptions, savingRow, keysRow, keysOptions, interfaceRow, draftRow);
 
     section.append(statusLine, enabledRow, untestedRow, parts);
     drawerContent.append(section);
@@ -182,7 +200,7 @@ export function addLbcSettings(drawerContent) {
         enabledRow.toggle(status.state === 'ready');
         untestedRow.toggle(status.state === 'ready' && status.compat !== 'tested');
         parts.toggle(status.active);
-        for (const row of [savingRow, interfaceRow]) row.toggleClass('lbl-lbc-unavailable', !status.domParts).attr('aria-disabled', String(!status.domParts));
+        for (const row of [savingRow, interfaceRow, keysRow]) row.toggleClass('lbl-lbc-unavailable', !status.domParts).attr('aria-disabled', String(!status.domParts));
     };
     render(getLbcStatus());
     onLbcStatusChange(render);

@@ -26,6 +26,8 @@ export const LBC = Object.freeze({
         translateButton: '#lbc-h-tr',
         /** "To English" next to the Simple-mode idea box. */
         translateIdea: '#lbc-tr-idea',
+        /** LBC's optimizer window (Audit / Optimize). */
+        optimizerModal: '#lbc-opt-modal',
         /** The panel header (title and buttons; LBC never re-renders it) and its "Reset" button. */
         header: '#lbc-panel .lbc-header',
         resetButton: '#lbc-h-reset',

@@ -400,7 +400,7 @@
     "\"{name}\" is ~{#t} tok with preventRecursion=false — its text will recursively trigger other entries.": "«{name}» — ~{t} ток. при preventRecursion=false: её текст будет рекурсивно включать другие записи.",
     "\"{name}\" is ~{#t} tok with {#n} broad keys. Consider selective + secondary keys as a gate.": "«{name}» — ~{t} ток. и {n} широких ключей. Стоит включить selective и добавить вторичные ключи как фильтр.",
     "Key \"{key}\" on \"{name}\" is a common word — it will misfire in ordinary prose.": "Ключ «{key}» у «{name}» — общее слово: будет срабатывать в обычном тексте.",
-    "Key \"{key}\" is short — enable matchWholeWords or it matches inside other words.": "Ключ «{key}» короткий — включите matchWholeWords, иначе он совпадёт внутри других слов.",
+    "Key \"{key}\" is short — enable matchWholeWords or it matches inside other words.": "Ключ «{key}» короткий — включите matchWholeWords, иначе он совпадёт внутри других слов. Для кириллицы эта галочка в SillyTavern не работает: нужен regex-ключ («Русские ключи»).",
     "\"{name}\": depth only applies to position 4 (@D).": "«{name}»: глубина действует только для позиции 4 (@D).",
     "DUPLICATE? #{#a} \"{x}\" and #{#b} \"{y}\" share {#p}% of their keys — both will always fire together.": "ДУБЛЬ? #{a} «{x}» и #{b} «{y}» делят {p}% ключей — они всегда сработают вместе.",
     "{#n} entries all sit at order={#o} — their priority under budget pressure is effectively random.": "{n} {n|запись стоит|записи стоят|записей стоят} на order={o} — при нехватке бюджета их приоритет по сути случаен.",

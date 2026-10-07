@@ -5,6 +5,8 @@
 // book that goes through LBC loses its uids, `extensions` (other extensions' data), roles, filters and triggers, and
 // every 0 in depth / order / probability becomes the default. Here an entry the module saw being loaded keeps its
 // original as the base: a field the user did not change keeps its original value, a changed one takes LBC's.
+import { MARKER_KEY } from '../constants.js';
+import { foldForm } from '../regex-builder.js';
 import { LBC_ENTRY_FIELDS, lbcEntryText, normalizeLikeLbc } from './adapter.js';
 
 /**
@@ -109,6 +111,37 @@ function applyCategory(out, entry, raw) {
     if (category && normalizeLikeLbc(out).category !== category) out.category = category;
 }
 
+const KEY_FIELDS = ['key', 'keysecondary'];
+
+/**
+ * LBC's Optimize and LLM Edit rewrite an entry's whole key list and may drop the word-form keys Lorebook Localizer
+ * added (its marker in `extensions` lists them). While every key they were made from is still there, the dropped ones
+ * come back; when a source key is gone (a renamed entity), that language's added keys and its record go, so the next
+ * localization translates the new keys from scratch.
+ * @param {any} out a World Info entry (changed in place)
+ */
+export function reconcileLocalizedKeys(out) {
+    const marker = out.extensions?.[MARKER_KEY];
+    if (!marker?.languages || typeof marker.languages !== 'object') return;
+    for (const [id, state] of Object.entries(marker.languages)) {
+        const present = new Set(KEY_FIELDS.flatMap(field => (Array.isArray(out[field]) ? out[field] : []).map(key => foldForm(String(key)))));
+        const sourcesKept = (state?.sources ?? []).every(source => present.has(foldForm(String(source))));
+        for (const field of KEY_FIELDS) {
+            const added = Array.isArray(state?.added?.[field]) ? state.added[field] : [];
+            if (!Array.isArray(out[field])) out[field] = [];
+            if (sourcesKept) {
+                const have = new Set(out[field].map(key => String(key).trim().toLowerCase()));
+                for (const key of added) if (!have.has(String(key).trim().toLowerCase())) out[field].push(key);
+            } else {
+                const drop = new Set(added);
+                out[field] = out[field].filter(key => !drop.has(key));
+            }
+        }
+        if (!sourcesKept) delete marker.languages[id];
+    }
+    if (!Object.keys(marker.languages).length) delete out.extensions[MARKER_KEY];
+}
+
 /**
  * @param {any} entry an LBC editor entry
  * @param {EntryLink|undefined} link
@@ -120,6 +153,7 @@ export function toWorldInfoEntry(entry, link, template) {
         const out = structuredClone(link.raw);
         const changed = changedFields(entry, link.raw);
         for (const field of changed) out[field] = exportValue(field, entry);
+        if (changed.includes('key') || changed.includes('keysecondary')) reconcileLocalizedKeys(out);
         // An entry moved to @depth needs a role; LBC writes system there.
         if (out.position === 4 && !Number.isInteger(out.role)) out.role = 0;
         applyCategory(out, entry, link.raw);
