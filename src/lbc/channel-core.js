@@ -30,18 +30,8 @@ export function resolveLbcProfileId(settings) {
     return own === LBC_PROFILE_INHERIT ? String(settings.profileId ?? '') : String(own);
 }
 
-/**
- * The `reasoning_effort` to send. Without the profile's preset (or with the RP preset's own setting) DeepSeek on
- * OpenRouter reasons by default, which only makes JSON slower and dearer; OpenRouter takes 'none' as given.
- * @param {string} mode `off` | `auto` | `low` | `medium` | `high`
- * @param {string|undefined} api the API or chat completion source (`openrouter`, …)
- * @returns {string|undefined} undefined: leave the request as it is
- */
-export function reasoningEffort(mode, api) {
-    if (mode === 'auto') return undefined;
-    if (mode === 'off' || !mode) return api === 'openrouter' ? 'none' : undefined;
-    return mode;
-}
+/** Model reasoning for LBC's requests: the same rule as for key translation (see ../reasoning.js). */
+export { reasoningEffort } from '../reasoning.js';
 
 /**
  * @param {string} rawPrompt LBC's quiet prompt before SillyTavern substituted macros in it

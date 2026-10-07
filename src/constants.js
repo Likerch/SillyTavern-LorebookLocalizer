@@ -29,6 +29,8 @@ export const DEFAULT_SETTINGS = Object.freeze({
     /** Seconds to wait for a reply; a request with no reply in time counts as a failed attempt. 0 = no limit. */
     requestTimeout: 90,
     temperature: 0.2,
+    /** Model reasoning for key translation: 'off' (none on OpenRouter) | 'auto' | 'low' | 'medium' | 'high'. */
+    reasoning: 'off',
     useJsonSchema: true,
     lastSelectedBooks: [],
     /** BunnyMo books and packs are skipped by the dialog unless this is on (the API never localizes them). */

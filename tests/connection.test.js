@@ -150,3 +150,56 @@ test('profile: the attempt signal goes down to sendRequest', async () => {
     assert.equal(sent[0].profileId, 'cheap');
     assert.ok(sent[0].overridePayload.json_schema);
 });
+
+test('profile: reasoning is off on OpenRouter unless chosen, and an answer lost to reasoning is an error', async () => {
+    const sent = [];
+    let reply = { content: '{"results":[]}', reasoning: '' };
+    const ctx = {
+        ConnectionManagerRequestService: {
+            sendRequest: async (profileId, msgs, maxTokens, custom, overridePayload) => {
+                sent.push(overridePayload);
+                return reply;
+            },
+        },
+    };
+    const openrouter = { kind: 'profile', profileId: 'main', isChat: true, api: 'openrouter', label: 'Main' };
+    const signal = new AbortController().signal;
+    await createRequestFn(openrouter, settings, ctx)(messages, { useSchema: false, signal });
+    assert.equal(sent.at(-1).reasoning_effort, 'none', 'default: off');
+    await createRequestFn(openrouter, { ...settings, reasoning: 'high' }, ctx)(messages, { useSchema: false, signal });
+    assert.equal(sent.at(-1).reasoning_effort, 'high');
+    await createRequestFn({ ...openrouter, api: 'deepseek' }, settings, ctx)(messages, { useSchema: false, signal });
+    assert.ok(!('reasoning_effort' in sent.at(-1)), 'other APIs keep their default');
+
+    reply = { content: '', reasoning: 'Let me think about every case of every word…' };
+    // The message goes through SillyTavern's i18n.
+    globalThis.SillyTavern = { getContext: () => ({ t: (strings, ...values) => String.raw({ raw: strings }, ...values) }) };
+    try {
+        await assert.rejects(createRequestFn(openrouter, settings, ctx)(messages, { useSchema: false, signal }), /reasoning/);
+    } finally {
+        delete globalThis.SillyTavern;
+    }
+});
+
+test('current connection: reasoning is set for our own request only', async () => {
+    const { ctx } = fakeContext();
+    const listeners = [];
+    ctx.eventTypes.CHAT_COMPLETION_SETTINGS_READY = 'settings_ready';
+    ctx.eventSource.on = (event, listener) => listeners.push(listener);
+    ctx.eventSource.makeLast = ctx.eventSource.on;
+    ctx.eventSource.removeListener = (event, listener) => listeners.splice(listeners.indexOf(listener), 1);
+    const chat = { kind: 'current', isChat: true, api: 'openai', label: 'x' };
+    const request = createRequestFn(chat, { ...settings, requestTimeout: 0 }, ctx);
+    const pending = request(messages, { useSchema: false, signal: new AbortController().signal });
+    await tick();
+    assert.equal(listeners.length, 1);
+    const ours = { messages: [{ role: 'system', content: 's' }], chat_completion_source: 'openrouter', reasoning_effort: 'high' };
+    const theirs = { messages: [{ role: 'system', content: 'RP prompt' }], chat_completion_source: 'openrouter', reasoning_effort: 'high' };
+    listeners.forEach(listener => { listener(theirs); listener(ours); });
+    assert.equal(ours.reasoning_effort, 'none');
+    assert.equal(theirs.reasoning_effort, 'high');
+    ctx.calls[0].answer({ text: 'ok' });
+    assert.equal(await pending, 'ok');
+    await tick();
+    assert.equal(listeners.length, 0, 'the listener goes with the request');
+});

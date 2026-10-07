@@ -165,5 +165,7 @@
     "Word forms before saving to ST": "Словоформы перед сохранением в ST",
     "When some entries have keys without Russian word forms, \"Import to ST\" can add them first (the model, then your review).": "Если у части записей ключи без русских словоформ, «Сохранить в ST» может сначала добавить их (модель, затем ваша проверка).",
     "Buttons in LoreBook Creator that translate entry keys and add every Russian word form with this extension's own pipeline and preview, plus a Russian section in its key audit.": "Кнопки в LoreBook Creator, которые переводят ключи записей и добавляют все русские словоформы — тем же конвейером и предпросмотром, что у Lorebook Localizer, — и русский раздел в его аудите ключей.",
-    "LoreBook Creator: the clean channel works while SillyTavern uses Chat Completion. Its requests go out as before.": "LoreBook Creator: чистый канал работает, пока SillyTavern использует Chat Completion. Сейчас запросы уходят по-старому."
+    "LoreBook Creator: the clean channel works while SillyTavern uses Chat Completion. Its requests go out as before.": "LoreBook Creator: чистый канал работает, пока SillyTavern использует Chat Completion. Сейчас запросы уходят по-старому.",
+    "The model spent the whole reply on reasoning and returned no answer. Turn reasoning off in Requests or raise the response length.": "Модель потратила весь ответ на рассуждения и ничего не вернула. Выключите рассуждения в «Запросах» или увеличьте длину ответа.",
+    "Model reasoning": "Рассуждения модели"
 }

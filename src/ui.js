@@ -292,6 +292,13 @@ export async function openMainDialog() {
         numberControl(settings, 'responseTokens', t`Response length, tokens`),
         numberControl(settings, 'requestTimeout', t`Reply timeout, seconds`, { hint: t`A request with no reply in this time is stopped and retried like an error. 0 means no limit.` }),
         numberControl(settings, 'temperature', t`Temperature (profile only)`, { step: 0.05 }),
+        selectControl(settings, 'reasoning', t`Model reasoning`, [
+            { value: 'off', text: t`Off (none on OpenRouter)` },
+            { value: 'auto', text: t`As the API decides` },
+            { value: 'low', text: t`Low` },
+            { value: 'medium', text: t`Medium` },
+            { value: 'high', text: t`High` },
+        ]),
         checkboxControl(settings, 'useJsonSchema', t`Use structured output (JSON schema) when the API supports it`),
     ));
 
