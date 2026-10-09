@@ -6,6 +6,7 @@ import { getLbcApi, LBC } from './adapter.js';
 import { channelPart } from './channel.js';
 import { compatibility, findLbcExtension, thirdPartyNames } from './compat.js';
 import { draftPart } from './draft.js';
+import { expandPart } from './expand.js';
 import { interfacePart } from './interface.js';
 import { keysPart } from './keys-ui.js';
 import { languagePart } from './language-ui.js';
@@ -44,8 +45,11 @@ const API_POLL_MS = 500;
  * @property {(scope: Scope, env: LbcEnv) => void} start
  */
 
-/** @type {LbcPart[]} The parts, in start order: the draft is put back after saving starts tracking entries. */
-const PARTS = [channelPart, languagePart, savingPart, draftPart, keysPart, interfacePart];
+/**
+ * @type {LbcPart[]} The parts, in start order: the draft is put back after saving starts tracking entries; "Expand the
+ * world" writes through saving.
+ */
+const PARTS = [channelPart, languagePart, savingPart, draftPart, keysPart, expandPart, interfacePart];
 
 /** @type {Omit<LbcStatus, 'active'|'domParts'>} */
 let found = { state: 'searching' };

@@ -11,7 +11,7 @@ const SAVE_EVERY_MS = 5000;
 const DRAFT_VERSION = 1;
 
 /** @returns {any} a localforage instance of the extension, or null when the page has no localforage */
-function openStore() {
+export function openLbcStore() {
     const localforage = /** @type {any} */ (globalThis).localforage;
     return localforage?.createInstance ? localforage.createInstance({ name: 'LorebookLocalizer', storeName: 'lbc' }) : null;
 }
@@ -58,7 +58,7 @@ export const draftPart = {
     start(scope, env) {
         const api = env.api();
         const data = api?.getData();
-        const store = openStore();
+        const store = openLbcStore();
         if (!data || !store) {
             env.log('draft: no editor data or no IndexedDB, drafts are off');
             return;

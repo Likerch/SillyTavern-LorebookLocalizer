@@ -61,6 +61,14 @@ export const DEFAULT_SETTINGS = Object.freeze({
     lbcKeys: true,
     /** Before "Import to ST": 'ask' | 'always' | 'never' add the missing word forms. */
     lbcKeysOnSave: 'ask',
+    /** "Expand the world" in LBC: new lore around a character, in one click or in a dialog (src/lbc/expand.js). */
+    lbcExpand: true,
+    /** Latest chat messages an expansion sees (0 = none). */
+    lbcExpandMessages: 20,
+    /** About how many entries one click adds or enriches: 5 | 10 | 20. */
+    lbcExpandSize: 10,
+    /** The dialog writes each accepted proposal into the book at once. */
+    lbcExpandSaveNow: true,
 });
 
 const SLAVIC_CASES = (cases) => `List all ${cases} cases in the singular and, for countable common nouns, in the plural. `

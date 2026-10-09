@@ -39,6 +39,8 @@ export const LBC = Object.freeze({
         downloadButton: '.lbc-exp-json',
         /** The hidden file input behind "Load LoreBook". */
         loadBookInput: '#lbc-file-loadbook',
+        /** "Load LoreBook" in the footer: the module's own footer buttons go after it (LBC builds the footer once). */
+        loadBookButton: '#lbc-f-loadbook',
         /** Everything LBC shows: the panel, the four windows, its block in Extensions, the chat-bar button. */
         uiRoots: '#lbc-panel, #lbc-le-modal, #lbc-mg-modal, #lbc-opt-modal, #lbc-fl-modal, #lbc-settings, #lbc-trigger',
         /** Where LBC puts those roots (the panel and windows go straight into <body>). */
@@ -267,6 +269,73 @@ export function lbcEntryText(entry) {
 /** Whether LBC's panel is open (its `togglePanel` adds `lbc-open`). */
 export function isLbcPanelOpen() {
     return $(LBC.selectors.panel).hasClass('lbc-open');
+}
+
+/** Whether LBC's panel is in its centered (modal) layout instead of the drawer on the right. */
+export function isLbcPanelCentered() {
+    return $(LBC.selectors.panel).hasClass('lbc-mode-center');
+}
+
+/**
+ * Takes the unsaved values of LBC's entry editor into the open entry, the way its own `saveEntryEditor` does on
+ * Back/Save. Needed before the entry is changed from outside or the panel is re-rendered: LBC would otherwise write
+ * the old form over the change, or the re-render would drop what was typed.
+ * @param {any} data LBC's editor state
+ */
+export function syncLbcEntryForm(data) {
+    const index = Number(data?.editingEntryIdx);
+    const entry = Number.isInteger(index) && index >= 0 ? data.entries?.[index] : null;
+    if (!entry || !$('#lbc-ed-comment').length) return;
+    const value = (selector) => {
+        const v = $(selector).val();
+        return typeof v === 'string' ? v : undefined;
+    };
+    const keys = (text) => text.split(',').map(key => key.trim()).filter(Boolean);
+    const comment = value('#lbc-ed-comment');
+    if (comment !== undefined) {
+        entry.comment = comment;
+        if (entry._origComment !== undefined) entry._origComment = comment;
+    }
+    const primary = value('#lbc-ed-keys');
+    if (primary !== undefined) entry.key = keys(primary);
+    const secondary = value('#lbc-ed-keys2');
+    if (secondary !== undefined) entry.keysecondary = keys(secondary);
+    const content = value('#lbc-ed-content');
+    if (content !== undefined) {
+        entry.content = content;
+        if (entry._origContent !== undefined) entry._origContent = content;
+    }
+    const category = value('#lbc-ed-category');
+    if (category !== undefined && category !== '__new__') entry.category = category;
+    const order = value('#lbc-ed-order');
+    if (order !== undefined) entry.order = parseInt(order, 10) || 100;
+    const position = value('#lbc-ed-position');
+    if (position !== undefined) entry.position = parseInt(position, 10) || 0;
+    const depth = value('#lbc-ed-depth');
+    if (depth !== undefined) entry.depth = parseInt(depth, 10) || 4;
+    if ($('#lbc-ed-constant').length) entry.constant = $('#lbc-ed-constant').is(':checked');
+    if ($('#lbc-ed-selective').length) entry.selective = $('#lbc-ed-selective').is(':checked');
+}
+
+/**
+ * Opens LBC's panel on the Entries tab of the advanced mode (what its `lbcShowEntries` does after a load), with one
+ * entry open in its editor when given.
+ * @param {{open: () => void, getData: () => any}} api
+ * @param {number} [index] the entry to open; -1 or none: the list
+ */
+export function showLbcEntries(api, index = -1) {
+    const data = api.getData();
+    syncLbcEntryForm(data);
+    data.mode = 'advanced';
+    data.activeTab = 'entries';
+    data.editingEntryIdx = index >= 0 && index < data.entries.length ? index : -1;
+    data._edParents = [];
+    $('.lbc-mode-btn').removeClass('active');
+    $('.lbc-mode-btn[data-mode="advanced"]').addClass('active');
+    $('#lbc-tabs').show();
+    $('.lbc-tab').removeClass('active');
+    $('.lbc-tab[data-tab="entries"]').addClass('active');
+    api.open();
 }
 
 /**

@@ -51,9 +51,10 @@ export function collectEditorItems(entries, indices, settings = getSettings(), l
 /**
  * How many of the editor's entries have keys still without Russian word forms.
  * @param {any[]} entries
+ * @param {number[]} [indices] only these entries (default: all)
  */
-export function countEntriesWithoutForms(entries) {
-    return collectEditorItems(entries, entries.map((_, index) => index)).items.length;
+export function countEntriesWithoutForms(entries, indices = entries.map((_, index) => index)) {
+    return collectEditorItems(entries, indices).items.length;
 }
 
 /**

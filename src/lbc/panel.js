@@ -188,7 +188,12 @@ export function addLbcSettings(drawerContent) {
     const keysRow = partCheckbox('lbcKeys', t`Russian keys`,
         t`Buttons in LoreBook Creator that translate entry keys and add every Russian word form with this extension's own pipeline and preview, plus a Russian section in its key audit.`);
     const keysOptions = $('<div class="lbl-grid lbl-lbc-options">').append(keysOnSaveField());
-    const parts = $('<div class="lbl-lbc-parts">').append(channelRow, channelOptions, savingRow, keysRow, keysOptions, interfaceRow, draftRow);
+    const expandRow = partCheckbox('lbcExpand', t`Expand the world`,
+        t`Buttons in LoreBook Creator and in the wand menu: new lore around the current character, in one click or in a dialog with the model, written into the character's lorebook (created and attached when there is none). Needs lossless saving.`);
+    const expandOptions = $('<div class="lbl-grid lbl-lbc-options">').append(
+        numberField('lbcExpandMessages', t`Latest chat messages to use`, { hint: t`The model sees this many of the latest chat messages. 0 = none.` }),
+    );
+    const parts = $('<div class="lbl-lbc-parts">').append(channelRow, channelOptions, savingRow, keysRow, keysOptions, expandRow, expandOptions, interfaceRow, draftRow);
 
     section.append(statusLine, enabledRow, untestedRow, parts);
     drawerContent.append(section);
@@ -200,7 +205,7 @@ export function addLbcSettings(drawerContent) {
         enabledRow.toggle(status.state === 'ready');
         untestedRow.toggle(status.state === 'ready' && status.compat !== 'tested');
         parts.toggle(status.active);
-        for (const row of [savingRow, interfaceRow, keysRow]) row.toggleClass('lbl-lbc-unavailable', !status.domParts).attr('aria-disabled', String(!status.domParts));
+        for (const row of [savingRow, interfaceRow, keysRow, expandRow]) row.toggleClass('lbl-lbc-unavailable', !status.domParts).attr('aria-disabled', String(!status.domParts));
     };
     render(getLbcStatus());
     onLbcStatusChange(render);

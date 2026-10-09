@@ -31,13 +31,17 @@ async function localizeAndRefresh(api, indices, exclusive) {
  * Before saving to SillyTavern: offers (or, by the setting, runs) Russian word forms for entries that lack them.
  * @param {any} api
  * @param {any} exclusive
+ * @param {{indices?: number[], cancellable?: boolean}} [options] `indices`: only these editor entries (default: all);
+ *   `cancellable: false`: the question has no Cancel, declining saves without the forms
  * @returns {Promise<boolean>} false: the user cancelled the save
  */
-export async function russianKeysBeforeSave(api, exclusive) {
+export async function russianKeysBeforeSave(api, exclusive, { indices, cancellable = true } = {}) {
     const settings = getSettings();
     if (!settings.lbcKeys || settings.lbcKeysOnSave === 'never' || !exclusive) return true;
     const data = api.getData();
-    const missing = countEntriesWithoutForms([...data.entries]);
+    const chosen = indices ?? data.entries.map((_, index) => index);
+    if (!chosen.length) return true;
+    const missing = countEntriesWithoutForms([...data.entries], chosen);
     if (!missing) return true;
     let choice = ADD;
     if (settings.lbcKeysOnSave !== 'always') {
@@ -46,17 +50,15 @@ export async function russianKeysBeforeSave(api, exclusive) {
             $('<h3>').text(t`Add Russian word forms first?`),
             $('<div>').text(t`${missing} entries have keys without Russian word forms: in a Russian roleplay they fire on one form only, or not at all. The model lists every form, you review them, then the book is saved.`),
         );
-        const popup = new ctx.Popup(content, ctx.POPUP_TYPE.CONFIRM, '', {
-            okButton: t`Add and save`,
-            cancelButton: t`Cancel`,
-            customButtons: [{ text: t`Save without them`, result: SKIP }],
-        });
+        const popup = new ctx.Popup(content, ctx.POPUP_TYPE.CONFIRM, '', cancellable
+            ? { okButton: t`Add and save`, cancelButton: t`Cancel`, customButtons: [{ text: t`Save without them`, result: SKIP }] }
+            : { okButton: t`Add and save`, cancelButton: t`Save without them` });
         const result = await popup.show();
         if (result === ctx.POPUP_RESULT.AFFIRMATIVE) choice = ADD;
-        else if (result === SKIP) choice = SKIP;
+        else if (result === SKIP || !cancellable) choice = SKIP;
         else return false;
     }
-    if (choice === ADD) await localizeAndRefresh(api, data.entries.map((_, index) => index), exclusive);
+    if (choice === ADD) await localizeAndRefresh(api, chosen, exclusive);
     return true;
 }
 

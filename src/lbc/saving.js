@@ -16,6 +16,41 @@ const OVERWRITE = 1;
 const COPY = 2;
 const PENDING_FILE_MS = 10_000;
 
+/**
+ * @typedef {object} SaveOptions
+ * @property {'full'|'patch'} [mode] `full` replaces the book's entries with the editor's (LBC's "Import to ST");
+ *   `patch` keeps the book's entries the editor does not hold (see buildBook)
+ * @property {boolean} [backup] back the book up first, as set in Lorebook Localizer (an empty book never is)
+ * @property {any[]} [russianKeysFor] offer Russian word forms for these editor entries first, as set in "word forms
+ *   before saving to ST"; declining saves without them
+ *
+ * @typedef {object} SaveResult
+ * @property {string} target
+ * @property {number} entries editor entries written
+ * @property {{kept: number, updated: number, added: number}} stats
+ * @property {string[]} backups
+ */
+
+/** @type {((target: string, options?: SaveOptions) => Promise<SaveResult>)|null} The running part's writer. */
+let writer = null;
+
+/** Whether lossless saving runs: writing the editor into a book needs it (it knows where every entry came from). */
+export function isLosslessSavingOn() {
+    return writer !== null;
+}
+
+/**
+ * Writes LBC's editor into a SillyTavern lorebook without asking: a book that exists is written over (in `patch`
+ * mode, only the editor's entries change). The editor holds that book afterwards.
+ * @param {string} target the book name
+ * @param {SaveOptions} [options]
+ * @returns {Promise<SaveResult>}
+ */
+export function saveEditorToBook(target, options = {}) {
+    if (!writer) return Promise.reject(new Error(t`Lossless saving is off: turn it on in the LoreBook Creator section of Lorebook Localizer to write into books.`));
+    return writer(target, options);
+}
+
 /** @type {import('./module.js').LbcPart} */
 export const savingPart = {
     id: 'saving',
@@ -167,7 +202,6 @@ export const savingPart = {
                 return;
             }
             if (!(await russianKeysBeforeSave(lbc, env.deps.exclusive))) return;
-            const entries = [...current];
             const names = ctx.getWorldInfoNames();
             let target = wantedName();
             if (names.includes(target)) {
@@ -176,14 +210,35 @@ export const savingPart = {
                 if (choice === COPY) target = freeBookName(target, names);
             }
 
+            const { entries, stats, backups } = await writeEditor(target, { mode: 'full', backup: true });
+            const message = t`"${target}" saved: ${entries} entries (${stats.kept} unchanged, ${stats.updated} changed, ${stats.added} new).`;
+            showLbcStatus(message, 'success');
+            toastr.success(backups.length ? `${message} ${t`Backup: ${backups.join(', ')}`}` : message, EXTENSION_TITLE);
+        }
+
+        /**
+         * @param {string} target
+         * @param {SaveOptions} options
+         * @returns {Promise<SaveResult>}
+         */
+        async function writeEditor(target, { mode = 'full', backup = true, russianKeysFor } = {}) {
+            if (russianKeysFor?.length) {
+                const indices = russianKeysFor.map(entry => current.indexOf(entry)).filter(index => index >= 0);
+                await russianKeysBeforeSave(lbc, env.deps.exclusive, { indices, cancellable: false });
+            }
+            const entries = [...current];
+            const names = ctx.getWorldInfoNames();
             const existing = names.includes(target) ? await ctx.loadWorldInfo(target) : null;
             const report = { backups: [] };
-            if (existing) await backupBook(target, existing, getSettings().backupMode, timestamp(), report);
+            if (existing && backup && Object.keys(existing.entries ?? {}).length) {
+                await backupBook(target, existing, getSettings().backupMode, timestamp(), report);
+            }
 
             const { data: book, uids, stats } = buildBook(entries, entry => links.get(entry), {
                 target,
                 template: newWorldInfoEntryTemplate,
                 existing,
+                mode,
             });
             await ctx.saveWorldInfo(target, book, true);
             await ctx.updateWorldInfoList();
@@ -194,12 +249,14 @@ export const savingPart = {
             data.worldName = target;
             data._origWorldName = target;
             data._loadedWorld = target;
-
-            const message = t`"${target}" saved: ${entries.length} entries (${stats.kept} unchanged, ${stats.updated} changed, ${stats.added} new).`;
-            showLbcStatus(message, 'success');
-            toastr.success(report.backups.length ? `${message} ${t`Backup: ${report.backups.join(', ')}`}` : message, EXTENSION_TITLE);
-            env.log('saved', target, stats);
+            env.log('saved', target, mode, stats);
+            return { target, entries: entries.length, stats, backups: report.backups };
         }
+
+        writer = writeEditor;
+        scope.add(() => {
+            if (writer === writeEditor) writer = null;
+        });
 
         async function downloadJson() {
             const entries = [...current];

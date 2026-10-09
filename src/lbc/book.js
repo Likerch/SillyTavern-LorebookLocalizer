@@ -188,12 +188,17 @@ export function toWorldInfoEntry(entry, link, template, current = null) {
  * is free in the target (taken = any uid the target has now, so a deleted entry's uid is never reused for something
  * else that other extensions may still refer to); everything else gets a new uid after the largest one.
  *
+ * Modes: `full` (LBC's "Import to ST") writes the editor's entries and nothing else, so an entry deleted in the editor
+ * leaves the book; `patch` (an expansion writing into a character's book) keeps every entry of the book the editor
+ * does not hold and only adds or updates the editor's ones.
+ *
  * @param {any[]} entries LBC editor entries, in editor order
  * @param {(entry: any) => EntryLink|undefined} linkOf
- * @param {{target: string, template: object, existing?: any}} options `existing`: the target book's current data
+ * @param {{target: string, template: object, existing?: any, mode?: 'full'|'patch'}} options `existing`: the target
+ *        book's current data
  * @returns {{data: {entries: Record<string, any>}, uids: number[], stats: {kept: number, updated: number, added: number}}}
  */
-export function buildBook(entries, linkOf, { target, template, existing = null }) {
+export function buildBook(entries, linkOf, { target, template, existing = null, mode = 'full' }) {
     const sameSource = `st:${target}`;
     const reserved = new Set(Object.values(existing?.entries ?? {}).map(entry => entry?.uid).filter(Number.isInteger));
     const existingByUid = new Map(Object.values(existing?.entries ?? {}).filter(entry => Number.isInteger(entry?.uid)).map(entry => [entry.uid, entry]));
@@ -209,6 +214,12 @@ export function buildBook(entries, linkOf, { target, template, existing = null }
     const base = existing ? structuredClone({ ...existing, entries: undefined }) : {};
     delete base.entries;
     const data = { ...base, entries: {} };
+    if (mode === 'patch') {
+        // The book's own entries first, by uid; the editor's entries then replace theirs or come on top.
+        for (const entry of Object.values(existing?.entries ?? {})) {
+            if (entry && Number.isInteger(entry.uid)) data.entries[entry.uid] = structuredClone(entry);
+        }
+    }
     const stats = { kept: 0, updated: 0, added: 0 };
     const uids = [];
     let nextDisplay = Math.max(-1, ...Object.values(existing?.entries ?? {}).map(entry => Number(entry?.displayIndex)).filter(Number.isFinite)) + 1;

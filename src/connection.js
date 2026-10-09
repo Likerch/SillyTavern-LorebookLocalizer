@@ -91,7 +91,8 @@ function overrideReasoning(ctx, messages, mode) {
 
 /**
  * Creates the LLM call used by the Translator. The call stops and settles soon after its signal aborts (a stop or
- * a timeout of the attempt).
+ * a timeout of the attempt). With `useSchema` the reply is constrained by the key translation schema, or by `schema`
+ * when given (`{name, value}`: another caller's JSON schema); `useSchema: false` asks for free text.
  * @param {ReturnType<typeof resolveConnection>} connection
  * @param {{responseTokens: number, temperature: number, reasoning?: string}} settings
  * @param {any} [ctx] SillyTavern's context (tests pass a fake one)
@@ -101,12 +102,12 @@ export function createRequestFn(connection, settings, ctx = SillyTavern.getConte
     if (connection.kind === 'profile') {
         // Sends through the chosen profile without switching the user's active connection. The signal goes down to
         // fetch(); profile requests share no global state, so a retry may start while an aborted call winds down.
-        return async (messages, { useSchema, signal }) => {
+        return async (messages, { useSchema, signal, schema }) => {
             const overridePayload = { temperature: settings.temperature };
             const effort = reasoningEffort(settings.reasoning ?? 'off', connection.api);
             if (effort !== undefined) overridePayload.reasoning_effort = effort;
             if (useSchema && connection.isChat) {
-                overridePayload.json_schema = { name: SCHEMA_NAME, strict: true, value: RESPONSE_SCHEMA };
+                overridePayload.json_schema = { name: schema?.name ?? SCHEMA_NAME, strict: true, value: schema?.value ?? RESPONSE_SCHEMA };
             }
             const result = await ctx.ConnectionManagerRequestService.sendRequest(
                 connection.profileId,
@@ -126,7 +127,7 @@ export function createRequestFn(connection, settings, ctx = SillyTavern.getConte
 
     // Current connection. generateRawData is used instead of generateRaw because generateRaw runs the reply
     // through the user's regex scripts (e.g. quote replacement), which can corrupt JSON.
-    return async (messages, { useSchema, signal }) => {
+    return async (messages, { useSchema, signal, schema }) => {
         // Take the next turn synchronously, then wait for the previous call to settle.
         const previous = rawCallsDone;
         /** @type {() => void} */
@@ -141,7 +142,7 @@ export function createRequestFn(connection, settings, ctx = SillyTavern.getConte
         }
 
         const jsonSchema = useSchema && connection.isChat
-            ? { name: SCHEMA_NAME, value: RESPONSE_SCHEMA, strict: true, returnInvalid: true }
+            ? { name: schema?.name ?? SCHEMA_NAME, value: schema?.value ?? RESPONSE_SCHEMA, strict: true, returnInvalid: true }
             : null;
         /** @type {ReturnType<typeof startRawGeneration>} */
         let call;

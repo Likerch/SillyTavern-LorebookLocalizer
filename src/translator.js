@@ -20,8 +20,9 @@ import { buildSystemPrompt, buildUserPrompt, looksTruncated, parseModelResponse,
  *
  * @callback RequestFn
  * @param {{role: string, content: string}[]} messages
- * @param {{useSchema: boolean, signal: AbortSignal}} options The signal aborts on a stop and on a timeout (its reason
- *   is then a `TimeoutError`); the request should stop and settle soon after. Its late answer is ignored either way.
+ * @param {{useSchema: boolean, signal: AbortSignal, schema?: {name: string, value: object}}} options The signal aborts
+ *   on a stop and on a timeout (its reason is then a `TimeoutError`); the request should stop and settle soon after.
+ *   Its late answer is ignored either way. `schema` replaces the key translation schema.
  * @returns {Promise<unknown>} Raw model output (string or already parsed object).
  */
 
