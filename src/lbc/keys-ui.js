@@ -17,10 +17,11 @@ const SKIP = 2;
  * @param {any} api LBC's public object
  * @param {number[]} indices
  * @param {any} exclusive
+ * @param {{review?: boolean}} [options]
  */
-async function localizeAndRefresh(api, indices, exclusive) {
+async function localizeAndRefresh(api, indices, exclusive, { review = true } = {}) {
     const data = api.getData();
-    const result = await localizeEditorEntries({ data, indices, exclusive });
+    const result = await localizeEditorEntries({ data, indices, exclusive, review });
     if (!result) return null;
     toastr.success(t`Russian word forms added: ${result.keys} keys in ${result.entries} entries.`, EXTENSION_TITLE);
     if (isLbcPanelOpen()) api.open();
@@ -31,11 +32,12 @@ async function localizeAndRefresh(api, indices, exclusive) {
  * Before saving to SillyTavern: offers (or, by the setting, runs) Russian word forms for entries that lack them.
  * @param {any} api
  * @param {any} exclusive
- * @param {{indices?: number[], cancellable?: boolean}} [options] `indices`: only these editor entries (default: all);
- *   `cancellable: false`: the question has no Cancel, declining saves without the forms
+ * @param {{indices?: number[], cancellable?: boolean, quiet?: boolean}} [options] `indices`: only these editor entries
+ *   (default: all); `cancellable: false`: the question has no Cancel, declining saves without the forms; `quiet`: no
+ *   question and no review — the forms are added as the model gives them (the world expansion: «одной кнопкой» means one)
  * @returns {Promise<boolean>} false: the user cancelled the save
  */
-export async function russianKeysBeforeSave(api, exclusive, { indices, cancellable = true } = {}) {
+export async function russianKeysBeforeSave(api, exclusive, { indices, cancellable = true, quiet = false } = {}) {
     const settings = getSettings();
     if (!settings.lbcKeys || settings.lbcKeysOnSave === 'never' || !exclusive) return true;
     const data = api.getData();
@@ -44,7 +46,7 @@ export async function russianKeysBeforeSave(api, exclusive, { indices, cancellab
     const missing = countEntriesWithoutForms([...data.entries], chosen);
     if (!missing) return true;
     let choice = ADD;
-    if (settings.lbcKeysOnSave !== 'always') {
+    if (settings.lbcKeysOnSave !== 'always' && !quiet) {
         const ctx = SillyTavern.getContext();
         const content = $('<div>').append(
             $('<h3>').text(t`Add Russian word forms first?`),
@@ -58,7 +60,7 @@ export async function russianKeysBeforeSave(api, exclusive, { indices, cancellab
         else if (result === SKIP || !cancellable) choice = SKIP;
         else return false;
     }
-    if (choice === ADD) await localizeAndRefresh(api, chosen, exclusive);
+    if (choice === ADD) await localizeAndRefresh(api, chosen, exclusive, { review: !quiet });
     return true;
 }
 

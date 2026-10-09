@@ -63,9 +63,10 @@ export function countEntriesWithoutForms(entries, indices = entries.map((_, inde
  * @param {any} options.data LBC's live editor state
  * @param {number[]} options.indices editor entries to localize
  * @param {ReturnType<import('../exclusive.js').createExclusive>} options.exclusive Localizer's one-job-at-a-time lock
+ * @param {boolean} [options.review] false: no review window, every proposal is taken (the world expansion's own saves)
  * @returns {Promise<{entries: number, keys: number}|null>} null when nothing was done (nothing to do, stopped, cancelled)
  */
-export async function localizeEditorEntries({ data, indices, exclusive }) {
+export async function localizeEditorEntries({ data, indices, exclusive, review = true }) {
     const ctx = SillyTavern.getContext();
     const settings = getSettings();
     const lang = lbcKeysLanguage(settings);
@@ -122,7 +123,7 @@ export async function localizeEditorEntries({ data, indices, exclusive }) {
                 : t`The model returned no usable translations. Details are in the browser console.`, EXTENSION_TITLE);
             return null;
         }
-        const accepted = await showPreview({ proposals, warnings: allWarnings, failures, stopped });
+        const accepted = review ? await showPreview({ proposals, warnings: allWarnings, failures, stopped }) : proposals;
         if (!accepted?.length) return null;
 
         let keys = 0;

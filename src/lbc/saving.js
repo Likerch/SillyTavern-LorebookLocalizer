@@ -224,7 +224,7 @@ export const savingPart = {
         async function writeEditor(target, { mode = 'full', backup = true, russianKeysFor } = {}) {
             if (russianKeysFor?.length) {
                 const indices = russianKeysFor.map(entry => current.indexOf(entry)).filter(index => index >= 0);
-                await russianKeysBeforeSave(lbc, env.deps.exclusive, { indices, cancellable: false });
+                await russianKeysBeforeSave(lbc, env.deps.exclusive, { indices, cancellable: false, quiet: true });
             }
             const entries = [...current];
             const names = ctx.getWorldInfoNames();
