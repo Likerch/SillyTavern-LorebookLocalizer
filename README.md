@@ -90,6 +90,8 @@ Hermione → Гермиона, Гермионы, Гермионе, Гермио�
 - **сохранение без потерь**: русские названия книг, вопрос перед перезаписью, бэкап, сохранённые uid, данные
   других расширений и все поля, которых LBC не знает;
 - **русские ключи**: словоформы для записей прямо в редакторе LBC и русский раздел в его аудите;
+- **расширить мир**: новый лор вокруг понравившегося персонажа — одной кнопкой с комментарием или в диалоге с
+  моделью — сразу в лорбук персонажа (если его нет, он создаётся и прикрепляется), без дублей и с отменой;
 - **русский интерфейс** и **черновик**, который переживает перезагрузку страницы.
 
 Подробно — в [docs/lorebook-creator.md](docs/lorebook-creator.md). Настройки — в разделе «LoreBook Creator» блока
@@ -189,7 +191,7 @@ npm test
 
 Модули `regex-builder`, `prompt`, `batching`, `translator`, `entries`, `protected`, `exclusive`, `headless` и `api` не зависят от ST и покрыты тестами в Node. Код, работающий с ST, лежит в `connection.js`, `lorebook.js`, `ui.js` и `st.js`; запросы из `connection.js` проверяются в тестах на поддельном контексте ST.
 
-Поддержка LoreBook Creator — в `src/lbc/`: всё знание о LBC собрано в `adapter.js`, чистая логика (`book`, `language`, `audit-ru`, `dictionary`, `channel-core`, `compat`, `scope`, `fetch-hook`) покрыта тестами. Часть тестов читает исходник LBC из `vendor/lorebook-creator` (в git не входит; без него они пропускаются):
+Поддержка LoreBook Creator — в `src/lbc/`: всё знание о LBC собрано в `adapter.js`, чистая логика (`book`, `language`, `audit-ru`, `dictionary`, `channel-core`, `compat`, `scope`, `fetch-hook`, `expand-core`) покрыта тестами. Часть тестов читает исходник LBC из `vendor/lorebook-creator` (в git не входит; без него они пропускаются):
 
 ```bash
 git clone https://github.com/virgilianshailer/lorebook-creator vendor/lorebook-creator
@@ -219,6 +221,9 @@ or other extensions' prompts; a chosen Connection Manager profile; no reasoning;
 on an unusable reply), entries are written in a chosen language with LBC's English categories kept, "Import to ST" /
 "Download JSON" keep Cyrillic names, uids, other extensions' data and every field LBC drops, "Russian keys" buttons
 add every word form with this extension's pipeline, and LBC's interface is translated while SillyTavern's is Russian.
+"Expand the world" grows the current character's lorebook around a comment in one click (applied at once, with undo)
+or in a dialog where each proposed entry is accepted or rejected; a character without a book gets one created (or its
+embedded book imported) and attached, and new lore is merged without duplicates (additions only append text and keys).
 Details (in Russian): [docs/lorebook-creator.md](docs/lorebook-creator.md).
 
 ### API for other extensions
