@@ -6,7 +6,7 @@ import {
     classifyLbcPrompt, isLbcPrompt, lbcExpectsJson, lbcParseJson, lbcReplyProblem, normalizeLikeLbc, unwrapLbcPrompt,
 } from '../src/lbc/adapter.js';
 import {
-    BASE_RULES, buildMessages, completionBody, errorBody, excerpt, LBC_PROFILE_INHERIT, reasoningEffort,
+    BASE_RULES, buildMessages, completionBody, errorBody, excerpt, LBC_PROFILE_INHERIT, mayBeReasoningRefusal, reasoningEffort,
     resolveLbcProfileId,
 } from '../src/lbc/channel-core.js';
 import { addFetchHandler, requestPath } from '../src/lbc/fetch-hook.js';
@@ -129,4 +129,12 @@ test('fetch hook: handlers answer or pass, next() can change the options, the wr
     await target.fetch('/api/x', {});
     assert.equal(seen, 0);
     assert.equal(requestPath('/api/backends/chat-completions/generate'), '/api/backends/chat-completions/generate');
+});
+
+test('reasoning refusal: recognized in what SillyTavern passes on', () => {
+    assert.ok(mayBeReasoningRefusal(new Error('Bad Request')));
+    assert.ok(mayBeReasoningRefusal({ error: { message: 'Bad Request' } }));
+    assert.ok(mayBeReasoningRefusal('Reasoning is mandatory for this endpoint and cannot be disabled.'));
+    assert.ok(!mayBeReasoningRefusal(new Error('Too Many Requests')));
+    assert.ok(!mayBeReasoningRefusal(undefined));
 });

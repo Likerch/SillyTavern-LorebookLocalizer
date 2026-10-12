@@ -31,7 +31,7 @@ export function resolveLbcProfileId(settings) {
 }
 
 /** Model reasoning for LBC's requests: the same rule as for key translation (see ../reasoning.js). */
-export { reasoningEffort } from '../reasoning.js';
+export { mayBeReasoningRefusal, reasoningEffort, rememberReasoningRequired, REQUIRED_EFFORT } from '../reasoning.js';
 
 /**
  * @param {string} rawPrompt LBC's quiet prompt before SillyTavern substituted macros in it

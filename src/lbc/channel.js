@@ -12,8 +12,9 @@ import { EXTENSION_TITLE } from '../constants.js';
 import { getSettings, t } from '../settings.js';
 import { classifyLbcPrompt, isLbcGenerating, isLbcPrompt, lbcExpectsJson, lbcParseJson, lbcReplyProblem, showLbcStatus } from './adapter.js';
 import {
-    buildMessages, CHAT_COMPLETION_URL, chatHasPrompt, completionBody, errorBody, excerpt, promptProbe, reasoningEffort,
-    rejectsTemperature, resolveLbcProfileId, ROUTE_MARK,
+    buildMessages, CHAT_COMPLETION_URL, chatHasPrompt, completionBody, errorBody, excerpt, mayBeReasoningRefusal,
+    promptProbe, reasoningEffort, rejectsTemperature, rememberReasoningRequired, REQUIRED_EFFORT, resolveLbcProfileId,
+    ROUTE_MARK,
 } from './channel-core.js';
 import { addFetchHandler } from './fetch-hook.js';
 import { applyContentLanguage, canonicalizeReplyCategories, languageRules } from './language.js';
@@ -161,7 +162,7 @@ export const channelPart = {
             if ('max_completion_tokens' in data) data.max_completion_tokens = settings.lbcResponseTokens;
             else data.max_tokens = settings.lbcResponseTokens;
             if ('temperature' in data) data.temperature = settings.lbcTemperature;
-            const effort = reasoningEffort(settings.lbcReasoning, data.chat_completion_source);
+            const effort = reasoningEffort(settings.lbcReasoning, data.chat_completion_source, data.model);
             if (effort !== undefined) data.reasoning_effort = effort;
         };
 
@@ -213,22 +214,43 @@ export const channelPart = {
                 let response;
                 let content;
                 if (job.profile) {
-                    const override = rejectsTemperature(job.profile.model) ? {} : { temperature: settings.lbcTemperature };
-                    const effort = reasoningEffort(settings.lbcReasoning, job.profile.api);
-                    if (effort !== undefined) override.reasoning_effort = effort;
-                    const result = await ctx.ConnectionManagerRequestService.sendRequest(
-                        job.profile.id,
-                        body.messages,
-                        settings.lbcResponseTokens,
-                        { stream: false, signal: controller.signal, extractData: true, includePreset: false, includeInstruct: true },
-                        override,
-                    );
+                    const profile = job.profile;
+                    /** @param {string|undefined} effort */
+                    const send = (effort) => {
+                        const override = rejectsTemperature(profile.model) ? {} : { temperature: settings.lbcTemperature };
+                        if (effort !== undefined) override.reasoning_effort = effort;
+                        return ctx.ConnectionManagerRequestService.sendRequest(
+                            profile.id,
+                            body.messages,
+                            settings.lbcResponseTokens,
+                            { stream: false, signal: controller.signal, extractData: true, includePreset: false, includeInstruct: true },
+                            override,
+                        );
+                    };
+                    const effort = reasoningEffort(settings.lbcReasoning, profile.api, profile.model);
+                    let result;
+                    try {
+                        result = await send(effort);
+                    } catch (error) {
+                        if (effort !== 'none' || controller.signal.aborted || !mayBeReasoningRefusal(error)) throw error;
+                        // The model's reasoning cannot be turned off: ask again with the lowest effort, and so from now on.
+                        result = await send(REQUIRED_EFFORT);
+                        rememberReasoningRequired(profile.model);
+                    }
                     content = typeof result === 'string' ? result : String(result?.content ?? '');
                     response = jsonResponse(completionBody(content));
                 } else {
                     response = await next({ ...init, body: JSON.stringify(body), signal: controller.signal });
                     if (!response.ok) return response;
-                    const data = await response.clone().json().catch(() => null);
+                    let data = await response.clone().json().catch(() => null);
+                    if (data?.error && body.reasoning_effort === 'none' && mayBeReasoningRefusal(data)) {
+                        // SillyTavern answers an API error with status 200 and {error}. The model's reasoning cannot be
+                        // turned off: ask again with the lowest effort, and so from now on.
+                        response = await next({ ...init, body: JSON.stringify({ ...body, reasoning_effort: REQUIRED_EFFORT }), signal: controller.signal });
+                        if (!response.ok) return response;
+                        data = await response.clone().json().catch(() => null);
+                        if (data && !data.error) rememberReasoningRequired(body.model);
+                    }
                     if (!data || data.error) return response;
                     content = String(ctx.extractMessageFromData(data) ?? '');
                 }

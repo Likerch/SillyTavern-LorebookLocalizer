@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequestFn } from '../src/connection.js';
+import { forgetReasoningRequired } from '../src/reasoning.js';
 import { RequestTimeoutError } from '../src/translator.js';
 
 const STOPPED = 'generation_stopped';
@@ -31,7 +32,7 @@ function fakeContext({ findableHook = true } = {}) {
             let answer = (_data) => {};
             let fail = (_error) => {};
             const network = new Promise((resolve, reject) => { answer = resolve; fail = reject; });
-            const call = { params, aborted: false, answer, settled: false };
+            const call = { params, aborted: false, answer, fail: (error) => fail(error), settled: false };
             const hook = () => {
                 call.aborted = true;
                 setTimeout(() => fail(new Error('Cancelled by stop event')), 5);
@@ -202,4 +203,73 @@ test('current connection: reasoning is set for our own request only', async () =
     assert.equal(await pending, 'ok');
     await tick();
     assert.equal(listeners.length, 0, 'the listener goes with the request');
+});
+
+test('profile: a model whose reasoning cannot be turned off is asked again with low effort, and so from then on', async () => {
+    forgetReasoningRequired();
+    const sent = [];
+    const ctx = {
+        ConnectionManagerRequestService: {
+            sendRequest: async (profileId, msgs, maxTokens, custom, overridePayload) => {
+                sent.push(overridePayload.reasoning_effort);
+                // What SillyTavern makes of OpenRouter's 400 "Reasoning is mandatory for this endpoint…".
+                if (overridePayload.reasoning_effort === 'none') throw new Error('Bad Request');
+                return { content: '{"results":[]}' };
+            },
+        },
+    };
+    const glm = { kind: 'profile', profileId: 'main', isChat: true, api: 'openrouter', model: 'z-ai/glm-5.3-flash', label: 'Main' };
+    const signal = new AbortController().signal;
+    assert.equal(await createRequestFn(glm, settings, ctx)(messages, { useSchema: false, signal }), '{"results":[]}');
+    assert.deepEqual(sent, ['none', 'low']);
+    await createRequestFn(glm, settings, ctx)(messages, { useSchema: false, signal });
+    assert.deepEqual(sent, ['none', 'low', 'low'], 'remembered for the model');
+    await createRequestFn({ ...glm, model: 'other/model' }, { ...settings, reasoning: 'high' }, ctx)(messages, { useSchema: false, signal });
+    assert.equal(sent.at(-1), 'high', 'a chosen effort is sent as it is');
+
+    // Another error is not retried, and a chosen effort is never changed.
+    sent.length = 0;
+    ctx.ConnectionManagerRequestService.sendRequest = async (profileId, msgs, maxTokens, custom, overridePayload) => {
+        sent.push(overridePayload.reasoning_effort);
+        throw new Error('Too Many Requests');
+    };
+    await assert.rejects(createRequestFn({ ...glm, model: 'deepseek/x' }, settings, ctx)(messages, { useSchema: false, signal }), /Too Many/);
+    assert.deepEqual(sent, ['none']);
+    forgetReasoningRequired();
+});
+
+test('current connection: a refusal of reasoning off is retried with low effort through the same listener', async () => {
+    forgetReasoningRequired();
+    const { ctx } = fakeContext();
+    const listeners = [];
+    ctx.eventTypes.CHAT_COMPLETION_SETTINGS_READY = 'settings_ready';
+    ctx.eventSource.on = (event, listener) => listeners.push(listener);
+    ctx.eventSource.makeLast = ctx.eventSource.on;
+    ctx.eventSource.removeListener = (event, listener) => listeners.splice(listeners.indexOf(listener), 1);
+    const chat = { kind: 'current', isChat: true, api: 'openai', label: 'x' };
+    const request = createRequestFn(chat, { ...settings, requestTimeout: 0 }, ctx);
+    const body = () => ({ messages: [{ role: 'system', content: 's' }], chat_completion_source: 'openrouter', model: 'google/gemini-3.8-flash' });
+
+    const pending = request(messages, { useSchema: false, signal: new AbortController().signal });
+    await tick();
+    const first = body();
+    listeners.forEach(listener => listener(first));
+    assert.equal(first.reasoning_effort, 'none');
+    ctx.calls[0].fail(new Error('Bad Request'));
+    await tick(10);
+    assert.equal(ctx.calls.length, 2, 'asked again');
+    const second = body();
+    listeners.forEach(listener => listener(second));
+    assert.equal(second.reasoning_effort, 'low');
+    ctx.calls[1].answer({ text: 'ok' });
+    assert.equal(await pending, 'ok');
+
+    const next = request(messages, { useSchema: false, signal: new AbortController().signal });
+    await tick();
+    const third = body();
+    listeners.forEach(listener => listener(third));
+    assert.equal(third.reasoning_effort, 'low', 'remembered for the model');
+    ctx.calls[2].answer({ text: 'ok' });
+    assert.equal(await next, 'ok');
+    forgetReasoningRequired();
 });

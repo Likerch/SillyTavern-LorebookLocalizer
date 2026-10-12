@@ -1,6 +1,6 @@
 import { settledOrAborted } from './batching.js';
 import { RESPONSE_SCHEMA, SCHEMA_NAME } from './prompt.js';
-import { reasoningEffort } from './reasoning.js';
+import { mayBeReasoningRefusal, reasoningEffort, rememberReasoningRequired, REQUIRED_EFFORT } from './reasoning.js';
 import { t } from './settings.js';
 import { isTimeoutError } from './translator.js';
 
@@ -26,7 +26,7 @@ export function getProfiles() {
 
 /**
  * @param {{profileId: string}} settings
- * @returns {{kind: 'profile', profileId: string, isChat: boolean, api: string, label: string} | {kind: 'current', isChat: boolean, api: string, label: string} | {kind: 'error', message: string}}
+ * @returns {{kind: 'profile', profileId: string, isChat: boolean, api: string, model?: string, label: string} | {kind: 'current', isChat: boolean, api: string, label: string} | {kind: 'error', message: string}}
  */
 export function resolveConnection(settings) {
     const ctx = SillyTavern.getContext();
@@ -35,7 +35,7 @@ export function resolveConnection(settings) {
             const profile = ctx.ConnectionManagerRequestService.getProfile(settings.profileId);
             ctx.ConnectionManagerRequestService.validateProfile(profile);
             const isChat = ctx.CONNECT_API_MAP[profile.api]?.selected === 'openai';
-            return { kind: 'profile', profileId: profile.id, isChat, api: profile.api, label: profile.name };
+            return { kind: 'profile', profileId: profile.id, isChat, api: profile.api, model: profile.model, label: profile.name };
         } catch (error) {
             return { kind: 'error', message: error?.message ?? String(error) };
         }
@@ -71,18 +71,22 @@ function startRawGeneration(ctx, params) {
  * generation prepared meanwhile is left alone.
  * @param {any} ctx
  * @param {{role: string, content: string}[]} messages
- * @param {string} mode the `reasoning` setting
+ * @param {(data: any) => string|undefined} effortFor the effort for the request body
+ * @param {{effort?: string, model?: string}} sent receives the effort and the model of the request
  * @returns {() => void} removes the listener
  */
-function overrideReasoning(ctx, messages, mode) {
+function overrideReasoning(ctx, messages, effortFor, sent) {
     const source = ctx.eventSource;
     const event = ctx.eventTypes?.CHAT_COMPLETION_SETTINGS_READY;
     if (!event || typeof source?.on !== 'function' || typeof source.removeListener !== 'function') return () => {};
     const first = messages[0]?.content;
     const listener = (data) => {
         if (!data || first === undefined || data.messages?.[0]?.content !== first) return;
-        const effort = reasoningEffort(mode, data.chat_completion_source);
-        if (effort !== undefined) data.reasoning_effort = effort;
+        const effort = effortFor(data);
+        sent.model = data.model;
+        if (effort === undefined) return;
+        data.reasoning_effort = effort;
+        sent.effort = effort;
     };
     if (typeof source.makeLast === 'function') source.makeLast(event, listener);
     else source.on(event, listener);
@@ -103,20 +107,32 @@ export function createRequestFn(connection, settings, ctx = SillyTavern.getConte
         // Sends through the chosen profile without switching the user's active connection. The signal goes down to
         // fetch(); profile requests share no global state, so a retry may start while an aborted call winds down.
         return async (messages, { useSchema, signal, schema }) => {
-            const overridePayload = { temperature: settings.temperature };
-            const effort = reasoningEffort(settings.reasoning ?? 'off', connection.api);
-            if (effort !== undefined) overridePayload.reasoning_effort = effort;
-            if (useSchema && connection.isChat) {
-                overridePayload.json_schema = { name: schema?.name ?? SCHEMA_NAME, strict: true, value: schema?.value ?? RESPONSE_SCHEMA };
+            /** @param {string|undefined} effort */
+            const send = (effort) => {
+                const overridePayload = { temperature: settings.temperature };
+                if (effort !== undefined) overridePayload.reasoning_effort = effort;
+                if (useSchema && connection.isChat) {
+                    overridePayload.json_schema = { name: schema?.name ?? SCHEMA_NAME, strict: true, value: schema?.value ?? RESPONSE_SCHEMA };
+                }
+                return ctx.ConnectionManagerRequestService.sendRequest(
+                    connection.profileId,
+                    messages,
+                    settings.responseTokens,
+                    // The profile's RP preset (jailbreaks, formatting rules) would only get in the way of JSON output.
+                    { stream: false, signal, extractData: true, includePreset: false, includeInstruct: true },
+                    overridePayload,
+                );
+            };
+            const effort = reasoningEffort(settings.reasoning ?? 'off', connection.api, connection.model);
+            let result;
+            try {
+                result = await send(effort);
+            } catch (error) {
+                if (effort !== 'none' || signal.aborted || !mayBeReasoningRefusal(error)) throw error;
+                // The model's reasoning cannot be turned off: ask again with the lowest effort, and so from now on.
+                result = await send(REQUIRED_EFFORT);
+                rememberReasoningRequired(connection.model);
             }
-            const result = await ctx.ConnectionManagerRequestService.sendRequest(
-                connection.profileId,
-                messages,
-                settings.responseTokens,
-                // The profile's RP preset (jailbreaks, formatting rules) would only get in the way of JSON output.
-                { stream: false, signal, extractData: true, includePreset: false, includeInstruct: true },
-                overridePayload,
-            );
             // A reasoning model may spend the whole response length on thoughts and answer nothing: say so.
             if (result && typeof result === 'object' && !String(result.content ?? '').trim() && String(result.reasoning ?? '').trim()) {
                 throw new Error(t`The model spent the whole reply on reasoning and returned no answer. Turn reasoning off in Requests or raise the response length.`);
@@ -127,7 +143,28 @@ export function createRequestFn(connection, settings, ctx = SillyTavern.getConte
 
     // Current connection. generateRawData is used instead of generateRaw because generateRaw runs the reply
     // through the user's regex scripts (e.g. quote replacement), which can corrupt JSON.
-    return async (messages, { useSchema, signal, schema }) => {
+    const mode = settings.reasoning ?? 'off';
+    return async (messages, options) => {
+        /** @type {{effort?: string, model?: string}} */
+        const sent = {};
+        try {
+            return await rawRequest(messages, options, data => reasoningEffort(mode, data.chat_completion_source, data.model), sent);
+        } catch (error) {
+            if (sent.effort !== 'none' || options.signal.aborted || !mayBeReasoningRefusal(error)) throw error;
+            // The model's reasoning cannot be turned off: ask again with the lowest effort, and so from now on.
+            const result = await rawRequest(messages, options, () => REQUIRED_EFFORT, {});
+            rememberReasoningRequired(sent.model);
+            return result;
+        }
+    };
+
+    /**
+     * @param {{role: string, content: string}[]} messages
+     * @param {{useSchema: boolean, signal: AbortSignal, schema?: {name: string, value: object}}} options
+     * @param {(data: any) => string|undefined} effortFor
+     * @param {{effort?: string, model?: string}} sent
+     */
+    async function rawRequest(messages, { useSchema, signal, schema }, effortFor, sent) {
         // Take the next turn synchronously, then wait for the previous call to settle.
         const previous = rawCallsDone;
         /** @type {() => void} */
@@ -146,7 +183,7 @@ export function createRequestFn(connection, settings, ctx = SillyTavern.getConte
             : null;
         /** @type {ReturnType<typeof startRawGeneration>} */
         let call;
-        const restoreReasoning = connection.isChat ? overrideReasoning(ctx, messages, settings.reasoning ?? 'off') : () => {};
+        const restoreReasoning = connection.isChat ? overrideReasoning(ctx, messages, effortFor, sent) : () => {};
         try {
             call = startRawGeneration(ctx, { prompt: messages, responseLength: settings.responseTokens, jsonSchema });
         } catch (error) {
@@ -174,5 +211,5 @@ export function createRequestFn(connection, settings, ctx = SillyTavern.getConte
         } finally {
             signal.removeEventListener('abort', onAbort);
         }
-    };
+    }
 }
