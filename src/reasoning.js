@@ -34,13 +34,19 @@ export function reasoningEffort(mode, api, model) {
 /**
  * Whether a failed request may have been refused for its reasoning being off. OpenRouter answers 400 "Reasoning is
  * mandatory for this endpoint and cannot be disabled", and SillyTavern passes on only the status text "Bad Request".
- * @param {unknown} error an Error, SillyTavern's `{error: {message}}` body or a message
+ * Connection profile requests wrap it once more: `Error('API request failed', {cause: Error('Bad Request')})`.
+ * @param {unknown} error an Error (its `cause` chain is checked too), SillyTavern's `{error: {message}}` body or a message
  * @returns {boolean}
  */
 export function mayBeReasoningRefusal(error) {
-    const anyError = /** @type {any} */ (error);
-    const text = String(typeof error === 'string' ? error : anyError?.error?.message ?? anyError?.message ?? '').trim();
-    return /^bad request$/i.test(text) || /reasoning\b.*\b(mandatory|cannot be disabled)/i.test(text);
+    let current = /** @type {any} */ (error);
+    for (let depth = 0; depth < 5 && current != null; depth++) {
+        const text = String(typeof current === 'string' ? current : current.error?.message ?? current.message ?? '').trim();
+        if (/^bad request$/i.test(text) || /reasoning\b.*\b(mandatory|cannot be disabled)/i.test(text)) return true;
+        if (typeof current !== 'object') break;
+        current = current.cause;
+    }
+    return false;
 }
 
 /**

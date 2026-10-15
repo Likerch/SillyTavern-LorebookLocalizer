@@ -135,6 +135,10 @@ test('reasoning refusal: recognized in what SillyTavern passes on', () => {
     assert.ok(mayBeReasoningRefusal(new Error('Bad Request')));
     assert.ok(mayBeReasoningRefusal({ error: { message: 'Bad Request' } }));
     assert.ok(mayBeReasoningRefusal('Reasoning is mandatory for this endpoint and cannot be disabled.'));
+    // Connection profile requests: the Connection Manager wraps ChatCompletionService's error.
+    assert.ok(mayBeReasoningRefusal(new Error('API request failed', { cause: new Error('Bad Request') })));
+    assert.ok(!mayBeReasoningRefusal(new Error('API request failed', { cause: new Error('Too Many Requests') })));
+    assert.ok(!mayBeReasoningRefusal(new Error('API request failed')));
     assert.ok(!mayBeReasoningRefusal(new Error('Too Many Requests')));
     assert.ok(!mayBeReasoningRefusal(undefined));
 });

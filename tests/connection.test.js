@@ -212,8 +212,11 @@ test('profile: a model whose reasoning cannot be turned off is asked again with 
         ConnectionManagerRequestService: {
             sendRequest: async (profileId, msgs, maxTokens, custom, overridePayload) => {
                 sent.push(overridePayload.reasoning_effort);
-                // What SillyTavern makes of OpenRouter's 400 "Reasoning is mandatory for this endpoint…".
-                if (overridePayload.reasoning_effort === 'none') throw new Error('Bad Request');
+                // What SillyTavern 1.19 makes of OpenRouter's 400 "Reasoning is mandatory for this endpoint…":
+                // ChatCompletionService throws the status text, the Connection Manager wraps it.
+                if (overridePayload.reasoning_effort === 'none') {
+                    throw new Error('API request failed', { cause: new Error('Bad Request') });
+                }
                 return { content: '{"results":[]}' };
             },
         },
@@ -231,9 +234,10 @@ test('profile: a model whose reasoning cannot be turned off is asked again with 
     sent.length = 0;
     ctx.ConnectionManagerRequestService.sendRequest = async (profileId, msgs, maxTokens, custom, overridePayload) => {
         sent.push(overridePayload.reasoning_effort);
-        throw new Error('Too Many Requests');
+        throw new Error('API request failed', { cause: new Error('Too Many Requests') });
     };
-    await assert.rejects(createRequestFn({ ...glm, model: 'deepseek/x' }, settings, ctx)(messages, { useSchema: false, signal }), /Too Many/);
+    await assert.rejects(createRequestFn({ ...glm, model: 'deepseek/x' }, settings, ctx)(messages, { useSchema: false, signal }),
+        error => /Too Many/.test(error.cause?.message));
     assert.deepEqual(sent, ['none']);
     forgetReasoningRequired();
 });
