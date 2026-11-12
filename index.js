@@ -7,6 +7,7 @@ import { createHeadless } from './src/headless.js';
 import { startLbcModule } from './src/lbc/module.js';
 import { addLbcSettings } from './src/lbc/panel.js';
 import { applyChanges, collectItems, removeAddedKeys, toPromptItem } from './src/lorebook.js';
+import { installMaestroAgents } from './src/maestro-agents.js';
 import { getSettings, t } from './src/settings.js';
 import { parseRegexFromString } from './src/st.js';
 import { Translator } from './src/translator.js';
@@ -137,7 +138,14 @@ function init() {
     addSettingsPanel(onOpen);
     addLbcSettings($('.lorebook-localizer-settings .inline-drawer-content'));
     startLbcModule({ exclusive });
+    // Maestro 1.34: «Расширить мир» in its «Агенты» window (registering again is a no-op for the same Maestro).
+    if (!maestroAgentsInstalled) {
+        maestroAgentsInstalled = true;
+        installMaestroAgents();
+    }
 }
+
+let maestroAgentsInstalled = false;
 
 // The API for other extensions (Maestro); the regex helpers work without SillyTavern being ready.
 installApi(createHeadless({

@@ -33,6 +33,7 @@ import { ExpandWindow } from './expand-ui.js';
 import { syncContentLanguageClass } from './language-ui.js';
 import { entryLinks } from './links.js';
 import { isLosslessSavingOn, saveEditorToBook } from './saving.js';
+import { reportExpand, tuneExpand } from '../maestro-agents.js';
 
 const FOOTER_CLASS = 'lbl-lbc-expand-footer';
 const WAND_ID = 'lbl_lbc_expand_wand';
@@ -394,29 +395,38 @@ export const expandPart = {
             if (connection.kind === 'current' && live().onlineStatus === 'no_connection') {
                 throw new Error(t`No API connection. Connect to an API or choose a connection profile.`);
             }
+            // Maestro 1.34: the user's instruction and parameters of the built-in agent «Localizer: расширить мир».
+            const tuned = tuneExpand(messages);
             const request = createRequestFn(connection, {
-                responseTokens: settings.lbcResponseTokens,
-                temperature: settings.lbcTemperature,
+                responseTokens: tuned.maxTokens ?? settings.lbcResponseTokens,
+                temperature: tuned.temperature ?? settings.lbcTemperature,
                 reasoning: settings.lbcReasoning,
             });
             // generateRawData substitutes macros in every message: keep {{user}} and {{char}} for the entries.
             const send = (list) => (connection.kind === 'current' ? escapeMessages(list) : list);
             const custom = api.getData().customCategories ?? [];
-            let attempt = messages;
+            let attempt = tuned.messages;
             for (let round = 1; ; round++) {
                 status(round === 1 ? t`Waiting for the model (${connection.label})…` : t`The answer was unusable, asking again (${connection.label})…`);
                 const started = Date.now();
-                const raw = await withTimeout((inner) => request(send(attempt), { useSchema: false, signal: inner }), signal);
+                let raw;
+                try {
+                    raw = await withTimeout((inner) => request(send(attempt), { useSchema: false, signal: inner }), signal);
+                } catch (error) {
+                    reportExpand({ ok: false, ms: Date.now() - started, error: String(error?.message ?? error), request: attempt });
+                    throw error;
+                }
                 const text = restoreMacros(typeof raw === 'string' ? raw : JSON.stringify(raw ?? ''));
                 env.log('expand: reply', mode, `${text.length} chars in ${Math.round((Date.now() - started) / 1000)} s`);
                 const parsed = parseExpandReply(text, mode, custom);
+                reportExpand({ ok: 'value' in parsed, ms: Date.now() - started, request: attempt, raw: text });
                 if ('value' in parsed) return parsed.value;
                 console.warn(`[${EXTENSION_TITLE}] LBC expand: unusable reply (${parsed.problem})`, text);
                 if (round >= 2) {
                     if (parsed.problem === 'empty') throw new Error(t`The model returned an empty reply.`);
                     throw new Error(t`The model did not answer with the expected JSON: «${excerpt(text)}». The full reply is in the browser console.`);
                 }
-                attempt = [...messages, retryMessage(parsed.problem)];
+                attempt = [...tuned.messages, retryMessage(parsed.problem)];
             }
         }
 
